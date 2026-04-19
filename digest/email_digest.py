@@ -4,6 +4,7 @@
 import argparse
 import json
 import math
+import os
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -22,6 +23,10 @@ def load_env():
             if line and not line.startswith("#") and "=" in line:
                 k, _, v = line.partition("=")
                 env[k.strip()] = v.strip().strip('"').strip("'")
+    # Fall back to environment variables for keys not found in the file
+    for key in ("RESEND_API_KEY", "RESEND_TO"):
+        if key not in env and key in os.environ:
+            env[key] = os.environ[key]
     return env
 
 # ── GitHub repo fetching ────────────────────────────────────────────────────

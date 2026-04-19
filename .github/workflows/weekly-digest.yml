@@ -1,0 +1,65 @@
+name: Weekly AI Digest
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"   # Every Monday at 8am UTC
+  workflow_dispatch:        # Allow manual runs
+
+jobs:
+  ecosystem:
+    name: AI Ecosystem Digest
+    runs-on: ubuntu-latest
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_TO: ${{ secrets.RESEND_TO }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run ecosystem digest
+        run: |
+          NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
+          HEADER="=== AI Ecosystem Digest · ${NOW} (last 7 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "ai skills claude code mcp server" \
+              --agent --emit=compact --auto-resolve --days=7 \
+              --save-dir=/tmp/digests --save-suffix=ecosystem
+          ) | python digest/email_digest.py --terms "ai skills" "claude code" "mcp server"
+
+  marketing:
+    name: AI Marketing Digest
+    runs-on: ubuntu-latest
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_TO: ${{ secrets.RESEND_TO }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run marketing digest
+        run: |
+          NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
+          HEADER="=== AI Marketing & Growth Digest · ${NOW} (last 7 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "ai marketing growth" \
+              --agent --emit=compact --auto-resolve --days=7 \
+              --save-dir=/tmp/digests --save-suffix=marketing
+          ) | python digest/email_digest.py --terms "ai marketing" "ai growth"
