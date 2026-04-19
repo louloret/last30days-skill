@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Daily digest: AI marketing and growth."""
+
+import argparse, subprocess, sys
+from datetime import datetime
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--days", type=int, default=30)
+args = parser.parse_args()
+
+candidates = sorted(Path.home().glob(".claude/plugins/cache/last30days-skill/last30days/*/"), key=lambda p: p.name)
+SKILL_ROOT = candidates[-1] if candidates else Path.home() / ".claude/skills/last30days"
+ENGINE   = SKILL_ROOT / "scripts" / "last30days.py"
+SAVE_DIR = Path.home() / "Projects" / "last30days" / "digests"
+EMAILER  = Path.home() / "Projects" / "last30days" / "scripts" / "email_digest.py"
+SAVE_DIR.mkdir(parents=True, exist_ok=True)
+
+if not ENGINE.exists():
+    print(f"ERROR: engine not found at {ENGINE}", file=sys.stderr); sys.exit(1)
+
+now    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+header = f"=== AI Marketing & Growth Digest · {now} (last {args.days} days) ===\n"
+print(header)
+
+result = subprocess.run(
+    ["python3.13", str(ENGINE), "ai marketing growth",
+     "--agent", "--emit=compact", "--auto-resolve",
+     f"--days={args.days}", f"--save-dir={SAVE_DIR}", "--save-suffix=marketing"],
+    text=True, capture_output=True
+)
+
+body = header + (result.stdout or "")
+print(body)
+
+if result.returncode == 0 and EMAILER.exists():
+    subprocess.run(
+        ["python3.13", str(EMAILER), "--terms", "ai marketing", "ai growth"],
+        input=body, text=True
+    )
+
+sys.exit(result.returncode)
