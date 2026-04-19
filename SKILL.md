@@ -1,6 +1,6 @@
 ---
 name: last30days
-version: "3.0.1"
+version: "3.1.0"
 description: "Research what people actually say about any topic in the last 30 days. Pulls posts and engagement from Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, and the web."
 argument-hint: 'last30days nvidia earnings reaction | last30days AI video tools | last30days what users want in react'
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
@@ -144,6 +144,7 @@ The single most common failure mode of this skill is the model reading this file
 
 Branching rule:
 
+- **If the user invoked `search <keywords>`** (e.g. `/last30days search rust async runtime`, `/last30days search AI video tools`): **STOP. Do NOT run the Python engine. Do NOT run Step 0.45 / 0.5 / 0.55. Jump directly to the `## Search mode` section at the bottom of this file and follow those instructions exclusively.**
 - **If the user provided a topic** (e.g. `/last30days Kanye West`, `/last30days nvidia earnings`): proceed to Step 0.5 / Step 0.55 / Step 0.75 / Research Execution below. Do not skip straight to WebSearch. WebSearch is a **supplement after** the Python engine runs (see Step 2). It is **not a substitute**.
 - **If the user provided no topic**: ask the user for a topic with a single short question. Do not run research. Do not run WebSearch. Wait.
 
@@ -157,7 +158,7 @@ If your Bash call to `last30days.py` does NOT include the FULL pre-flight checkl
 
 ---
 
-# last30days v3.0.1: Research Any Topic from the Last 30 Days
+# last30days v3.1.0: Research Any Topic from the Last 30 Days
 
 > **Permissions overview:** Reads public web/platform data and optionally saves research briefings to `~/Documents/Last30Days/`. X/Twitter search uses optional user-provided tokens (AUTH_TOKEN/CT0 env vars). Bluesky search uses optional app password (BSKY_HANDLE/BSKY_APP_PASSWORD env vars - create at bsky.app/settings/app-passwords). All credential usage and data writes are documented in the [Security & Permissions](#security--permissions) section.
 
@@ -1472,5 +1473,150 @@ Want another prompt? Just tell me what you're creating next.
 - Can be invoked autonomously by agents via the Skill tool (runs inline, not forked); pass `--agent` for non-interactive report output
 
 **Bundled scripts:** `scripts/last30days.py` (main research engine), `scripts/lib/` (search, enrichment, rendering modules), `scripts/lib/vendor/bird-search/` (vendored X search client, MIT licensed)
+
+---
+
+## Search mode
+
+**Triggered by:** `/last30days search <keywords>` (e.g. `/last30days search rust async runtime`, `/last30days search AI video tools`)
+
+**This mode is entirely separate from the research flow.** Do NOT run `scripts/last30days.py`. Do NOT run Step 0.45 / 0.5 / 0.55. Do NOT run WebSearch. The only network calls are the GitHub API fetches below. Follow these steps exclusively.
+
+---
+
+### Step S1 - Announce and fetch
+
+Display a one-liner before fetching:
+
+```
+/last30days search - finding hottest GitHub repos for "{KEYWORDS}".
+```
+
+Then make **four Bash calls in parallel** (keyword search + MCP server topic search, each by stars and by recency):
+
+**Fetch 1 - keyword search, sorted by stars:**
+```bash
+curl -s "https://api.github.com/search/repositories?q={URL_ENCODED_KEYWORDS}&sort=stars&per_page=20" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28"
+```
+
+**Fetch 2 - keyword search, sorted by recently updated:**
+```bash
+curl -s "https://api.github.com/search/repositories?q={URL_ENCODED_KEYWORDS}&sort=updated&per_page=20" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28"
+```
+
+**Fetch 3 - MCP servers matching keywords, sorted by stars:**
+```bash
+curl -s "https://api.github.com/search/repositories?q={URL_ENCODED_KEYWORDS}+topic:mcp-server&sort=stars&per_page=10" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28"
+```
+
+**Fetch 4 - MCP servers matching keywords, sorted by recently updated:**
+```bash
+curl -s "https://api.github.com/search/repositories?q={URL_ENCODED_KEYWORDS}+topic:mcp-server&sort=updated&per_page=10" \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28"
+```
+
+URL-encode the keywords (spaces become `+` or `%20`). For example, keywords `rust async runtime` become `rust+async+runtime`.
+
+---
+
+### Step S2 - Deduplicate and re-rank
+
+Combine both result sets. Deduplicate by `full_name` (keep one entry per repo).
+
+**Scoring formula** (higher = better rank):
+
+```
+score = log10(stargazers_count + 1) * 3 + recency_score
+```
+
+Where `recency_score` is:
+- 5  if `pushed_at` is within the last 7 days
+- 4  if within the last 30 days
+- 3  if within the last 90 days
+- 2  if within the last 365 days
+- 1  otherwise
+
+This formula rewards repos that are both well-starred AND actively maintained. A repo with 10,000 stars pushed 3 days ago scores higher than a 50,000-star repo last touched 2 years ago.
+
+Take the top 10 by score.
+
+---
+
+### Step S3 - Display results
+
+Compute a human-readable "updated N days/weeks/months ago" string from `pushed_at` relative to today's date.
+
+Display the numbered list in this exact format (one repo per line, no blank lines between entries):
+
+```
+1. owner/repo  ★ 1234  updated 2 days ago  [mcp] - description
+2. owner/repo  ★ 567   updated 1 week ago - description
+...
+```
+
+Rules:
+- Use ` - ` (space hyphen space) as the separator before the description, never an em-dash.
+- If `description` is null or empty, omit the separator and description entirely.
+- Truncate descriptions longer than 100 characters with `...`.
+- If the repo's `topics` array contains `mcp-server`, append `  [mcp]` after the updated date and before the ` - ` separator.
+- Right-align the star counts within the list (pad with spaces) so columns read cleanly, but only if it doesn't require complex formatting - a simple space-separated line is fine.
+- Show at most 10 results.
+
+After the list, print one blank line then the source line:
+
+```
+GitHub public search · sorted by stars + recency · {TOTAL_COMBINED_UNIQUE} repos considered
+```
+
+---
+
+### Step S4 - Follow-up menu
+
+After displaying results, ask:
+
+```
+What next?
+  [1-10] Research that repo with /last30days (enter the number)
+  [b]    Open a repo in browser (enter b + number, e.g. b3)
+  [done] Nothing, I'm done browsing
+```
+
+Wait for the user's response, then handle each case:
+
+**If user enters a number (1-10):**
+- Identify the repo at that position (e.g. `owner/repo`).
+- Say: `Researching {owner/repo} with /last30days...`
+- Re-enter the normal last30days research flow from the top, with TOPIC set to `{owner/repo}` (e.g. `rust-lang/tokio`). This means running Step 0 through synthesis exactly as if the user had typed `/last30days rust-lang/tokio`. The `--github-repo={owner/repo}` flag MUST be included in the engine call.
+
+**If user enters `b` followed by a number (e.g. `b3`, `b 3`):**
+- Identify the repo at that position.
+- Display: `https://github.com/{owner}/{repo}`
+- Then re-display the menu so the user can keep browsing.
+
+**If user enters `done` (or any variation like "done", "exit", "no", "nothing", "stop"):**
+- Reply: `Done. Run /last30days search <keywords> anytime to find new repos.`
+- End the interaction. Do NOT run any research.
+
+**If the input is ambiguous or unrecognized:**
+- Re-display the menu with a one-line clarification: `Enter a number (1-10), b+number to open in browser, or "done".`
+
+---
+
+### Search mode constraints
+
+- **No Python engine calls.** This mode never invokes `scripts/last30days.py`.
+- **No WebSearch calls.** The GitHub API is the only data source.
+- **No badge required.** The `🌐 last30days v{VERSION} · synced {YYYY-MM-DD}` badge is for research output only. Search mode does not emit it.
+- **No Sources block.** LAW 1 applies: do not append a Sources or References section.
+- **No engine footer.** The `✅ All agents reported back!` footer is produced by the Python engine. It does not apply to search mode.
+- **GitHub rate limits.** The public GitHub search API allows 10 unauthenticated requests/minute. Two fetches per invocation is well within this limit. If the API returns a 403 or `rate limit exceeded` message, display it to the user and suggest retrying in 60 seconds.
+- **If no results are returned** (empty `items` array from both fetches), display: `No GitHub repos found for "{KEYWORDS}". Try broader keywords.`
 
 Review scripts before first use to verify behavior.
