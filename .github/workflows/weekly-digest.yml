@@ -22,7 +22,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install -e .
+        run: pip install requests
 
       - name: Run ecosystem digest
         run: |
@@ -51,7 +51,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install -e .
+        run: pip install requests
 
       - name: Run marketing digest
         run: |
