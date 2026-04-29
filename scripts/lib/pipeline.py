@@ -25,7 +25,6 @@ from . import (
     perplexity,
     pinterest,
     planner,
-    polymarket,
     providers,
     query,
     reddit,
@@ -71,7 +70,6 @@ MOCK_AVAILABLE_SOURCES = [
     "hackernews",
     "bluesky",
     "truthsocial",
-    "polymarket",
     "grounding",
     "xiaohongshu",
     "github",
@@ -101,7 +99,7 @@ def available_sources(config: dict[str, Any], requested_sources: list[str] | Non
         available.append("x")
     if which("yt-dlp") or env.is_youtube_sc_available(config):
         available.append("youtube")
-    available.extend(["hackernews", "polymarket"])
+    available.append("hackernews")
     if config.get("GITHUB_TOKEN") or which("gh"):
         available.append("github")
     if env.is_bluesky_available(config):
@@ -480,13 +478,6 @@ def _finalize_items_by_source(
     for source, items in items_by_source_raw.items():
         items = sorted(items, key=lambda item: item.local_rank_score or 0.0, reverse=True)
         items = dedupe.dedupe_items(items)
-        # Post-merge topic-relevance filter for Polymarket: comparison queries
-        # fan out into per-entity subqueries ("Hermes", "OpenClaw") whose topic
-        # is too narrow for Gamma API to filter meaningfully. Re-validating the
-        # merged list against the full original topic drops off-topic markets
-        # (e.g., WTI crude oil, Elon tweet counts) before footer emission.
-        if source == "polymarket" and topic:
-            items = polymarket.filter_items_against_topic(topic, items)
         finalized[source] = items
     return finalized
 
@@ -932,9 +923,6 @@ def _retrieve_stream(
     if source == "truthsocial":
         result = truthsocial.search_truthsocial(subquery.search_query, from_date, to_date, depth=depth, config=config)
         return truthsocial.parse_truthsocial_response(result), {}
-    if source == "polymarket":
-        result = polymarket.search_polymarket(subquery.search_query, from_date, to_date, depth=depth)
-        return polymarket.parse_polymarket_response(result, topic=subquery.search_query), {}
     if source == "github":
         result = github.search_github(subquery.search_query, from_date, to_date, depth=depth, token=config.get("GITHUB_TOKEN"))
         return result, {}

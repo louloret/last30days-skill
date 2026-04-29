@@ -15,7 +15,6 @@ ALLOWED_INTENTS = {
     "how_to",
     "comparison",
     "breaking_news",
-    "prediction",
 }
 ALLOWED_CLUSTER_MODES = {"none", "story", "workflow", "market", "debate"}
 QUICK_SOURCE_PRIORITY = {
@@ -25,8 +24,7 @@ QUICK_SOURCE_PRIORITY = {
     "opinion": ["reddit", "x", "youtube", "hackernews"],
     "how_to": ["youtube", "reddit", "x", "hackernews"],
     "comparison": ["reddit", "x", "hackernews", "youtube"],
-    "breaking_news": ["x", "reddit", "hackernews", "youtube", "polymarket"],
-    "prediction": ["polymarket", "x", "hackernews", "reddit", "youtube"],
+    "breaking_news": ["x", "reddit", "hackernews", "youtube"],
 }
 SOURCE_PRIORITY = {
     "factual": ["hackernews", "reddit", "x", "youtube"],
@@ -35,8 +33,7 @@ SOURCE_PRIORITY = {
     "opinion": ["reddit", "x", "youtube", "hackernews"],
     "how_to": ["youtube", "reddit", "x", "hackernews"],
     "comparison": ["reddit", "x", "hackernews", "youtube"],
-    "breaking_news": ["x", "reddit", "hackernews", "youtube", "polymarket"],
-    "prediction": ["polymarket", "x", "hackernews", "reddit", "youtube"],
+    "breaking_news": ["x", "reddit", "hackernews", "youtube"],
 }
 SOURCE_LIMITS = {
     "quick": {
@@ -47,16 +44,12 @@ SOURCE_LIMITS = {
         "how_to": 2,
         "comparison": 2,
         "breaking_news": 2,
-        "prediction": 2,
     },
     # "default" intentionally absent: all available sources are searched
     # at default depth. Fusion and reranking handle quality. quick mode
     # uses tight budgets above for latency.
 }
-INTENT_SOURCE_EXCLUSIONS: dict[str, set[str]] = {
-    "concept": {"polymarket"},
-    "how_to": {"polymarket"},
-}
+INTENT_SOURCE_EXCLUSIONS: dict[str, set[str]] = {}
 SOURCE_CAPABILITIES = {
     "reddit": {"discussion", "social"},
     "x": {"discussion", "social"},
@@ -66,14 +59,13 @@ SOURCE_CAPABILITIES = {
     "hackernews": {"discussion", "link"},
     "bluesky": {"discussion", "social"},
     "truthsocial": {"discussion", "social"},
-    "polymarket": {"market"},
     "xiaohongshu": {"video", "video_shortform", "social"},
     "github": {"discussion", "link"},
     "grounding": {"web", "reference", "link"},
     "perplexity": {"web", "reference", "analysis"},
 }
 DEFAULT_INTENT_CAPABILITIES = {
-    "comparison": {"discussion", "video", "web", "reference", "social", "link", "market"},
+    "comparison": {"discussion", "video", "web", "reference", "social", "link"},
     "how_to": {"discussion", "video", "web", "reference", "link"},
 }
 
@@ -134,7 +126,7 @@ Requested sources: {requested}
 
 Return JSON only with this shape:
 {{
-  "intent": "factual|product|concept|opinion|how_to|comparison|breaking_news|prediction",
+  "intent": "factual|product|concept|opinion|how_to|comparison|breaking_news",
   "freshness_mode": "strict_recent|balanced_recent|evergreen_ok",
   "cluster_mode": "none|story|workflow|market|debate",
   "source_weights": {{"source_name": 0.0}},
@@ -155,8 +147,8 @@ Rules:
 - every subquery must include both search_query and ranking_query
 - sources must be drawn from Available sources only
 - use cluster_mode=none for factual or many how-to queries
-- use strict_recent for breaking news and most predictions
-- use debate for comparison/opinion, market for prediction, workflow for how_to, story for breaking_news
+- use strict_recent for breaking news
+- use debate for comparison/opinion, workflow for how_to, story for breaking_news
 - search_query should be concise and keyword-heavy
 - ranking_query should read like a natural-language question
 - preserve exact proper nouns and entity strings from the topic
@@ -361,16 +353,6 @@ def _fallback_plan(
                         weight=0.65,
                     )
                 )
-    elif depth != "quick" and intent == "prediction":
-        subqueries.append(
-            schema.SubQuery(
-                label="odds",
-                search_query=f"{base_search} odds forecast",
-                ranking_query=f"What are the current odds, forecasts, or market signals about {topic}?",
-                sources=[source for source in source_weights if source in {"polymarket", "grounding", "x", "reddit"}] or list(source_weights),
-                weight=0.7,
-            )
-        )
     elif depth != "quick" and intent == "breaking_news":
         subqueries.append(
             schema.SubQuery(
@@ -402,8 +384,6 @@ def _infer_intent(topic: str) -> str:
     # Slash-separated proper nouns: "React/Vue/Svelte" (not URLs, not acronyms like CI/CD or I/O)
     if not re.search(r"https?://", topic) and re.search(r"\b[A-Z][a-z]{2,}(?:/[A-Z][a-z]{2,})+\b", topic):
         return "comparison"
-    if re.search(r"\b(odds|predict|prediction|forecast|chance|probability|will .* win)\b", text):
-        return "prediction"
     if re.search(r"\b(how to|tutorial|guide|setup|step by step|deploy|install)\b", text):
         return "how_to"
     if re.search(r"\b(what is|what are|who is|who acquired|when did|parameter count|release date)\b", text):
@@ -422,7 +402,7 @@ def _infer_intent(topic: str) -> str:
 
 
 def _default_freshness(intent: str) -> str:
-    if intent in {"breaking_news", "prediction"}:
+    if intent == "breaking_news":
         return "strict_recent"
     if intent in {"concept", "how_to"}:
         return "evergreen_ok"
@@ -434,7 +414,6 @@ def _default_cluster_mode(intent: str) -> str:
         "breaking_news": "story",
         "comparison": "debate",
         "opinion": "debate",
-        "prediction": "market",
         "how_to": "workflow",
         "factual": "none",
         "product": "none",
@@ -444,20 +423,32 @@ def _default_cluster_mode(intent: str) -> str:
 
 def _default_source_weights(intent: str, sources: list[str]) -> dict[str, float]:
     base = {source: 1.0 for source in sources}
-    if intent == "prediction":
-        for source, bonus in {"polymarket": 2.5, "x": 1.3}.items():
-            if source in base:
-                base[source] += bonus
-    elif intent == "breaking_news":
+    if intent == "breaking_news":
         for source, bonus in {"x": 1.5, "reddit": 1.3, "hackernews": 0.8}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "how_to":
-        for source, bonus in {"youtube": 2.0, "hackernews": 0.8}.items():
+        for source, bonus in {"youtube": 2.0, "reddit": 0.8, "hackernews": 0.8}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "factual":
-        for source, bonus in {"reddit": 0.8, "x": 0.5}.items():
+        for source, bonus in {"reddit": 1.0, "x": 0.5}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "opinion":
+        for source, bonus in {"reddit": 1.5, "x": 0.8}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "product":
+        for source, bonus in {"reddit": 1.2, "youtube": 0.8}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "concept":
+        for source, bonus in {"reddit": 1.0, "hackernews": 0.8}.items():
+            if source in base:
+                base[source] += bonus
+    elif intent == "comparison":
+        for source, bonus in {"reddit": 1.3, "hackernews": 0.5}.items():
             if source in base:
                 base[source] += bonus
     return base

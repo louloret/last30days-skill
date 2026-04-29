@@ -129,8 +129,6 @@ def _infer_query_intent(topic: str) -> str:
         return "opinion"
     if re.search(r"\b(pricing|feature|features|best .* for)\b", text):
         return "product"
-    if re.search(r"\b(predict|prediction|odds|forecast|chance)\b", text):
-        return "prediction"
     return "breaking_news"
 
 

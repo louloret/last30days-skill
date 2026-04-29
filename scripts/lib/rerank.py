@@ -16,10 +16,6 @@ INTENT_SCORING_HINTS: dict[str, str] = {
         "Prefer tutorials, step-by-step guides, and practical demonstrations."
         " Video walkthroughs and code examples score higher than theoretical discussion."
     ),
-    "prediction": (
-        "Prefer items with quantitative forecasts, odds, market data, or expert"
-        " predictions. Vague speculation scores lower."
-    ),
     "factual": (
         "Prefer items with specific facts, dates, numbers, and primary sources."
         " News reports with direct quotes score higher than commentary."

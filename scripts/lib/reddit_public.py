@@ -26,8 +26,8 @@ USER_AGENT = "last30days/3.0 (research tool)"
 # Depth-aware limits for thread counts
 DEPTH_LIMITS = {
     "quick": 10,
-    "default": 25,
-    "deep": 50,
+    "default": 40,
+    "deep": 75,
 }
 
 # How many top posts to enrich with comments, by depth

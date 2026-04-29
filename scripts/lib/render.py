@@ -348,7 +348,7 @@ def render_full(report: schema.Report) -> str:
     lines.append("## All Items by Source")
     lines.append("")
     source_order = ["reddit", "x", "youtube", "tiktok", "instagram", "threads", "pinterest",
-                    "hackernews", "bluesky", "truthsocial", "polymarket", "grounding", "xiaohongshu", "github", "perplexity"]
+                    "hackernews", "bluesky", "truthsocial", "grounding", "xiaohongshu", "github", "perplexity"]
     for source in source_order:
         items = report.items_by_source.get(source, [])
         if not items:
@@ -391,12 +391,6 @@ def render_full(report: schema.Report) -> str:
                 lines.append(f"  <details><summary>Transcript ({len(transcript.split())} words)</summary>")
                 lines.append(f"  {transcript[:5000]}")
                 lines.append("  </details>")
-            # Polymarket outcome prices and market details
-            outcome_prices = item.metadata.get("outcome_prices") or []
-            if outcome_prices and item.source == "polymarket":
-                question = item.metadata.get("question") or ""
-                if question and question != item.title:
-                    lines.append(f"  Question: {question}")
                 odds_parts = []
                 for name, price in outcome_prices:
                     if isinstance(price, (int, float)):
@@ -512,88 +506,6 @@ def _format_volume_short(volume: float) -> str:
     if volume >= 1:
         return f"${volume:.0f}"
     return ""
-
-
-def _shorten_polymarket_title(title: str) -> str:
-    """Strip boilerplate from a Polymarket question to produce a compact descriptor.
-
-    Examples:
-    - "Will Kanye West visit the UK by June 30?" -> "UK visit"
-    - "Kanye West blocked from entering another country by June 30?" -> "blocked from entering another country"
-    - "Will Bianca and Kanye West separate in 2026?" -> "Bianca and Kanye West separate"
-
-    Falls back to first 3-4 significant words if stripping does not reduce below 40 chars.
-    Never truncates mid-word.
-    """
-    import re
-
-    t = (title or "").strip().rstrip("?").strip()
-
-    # Drop leading "Will "
-    if t.lower().startswith("will "):
-        t = t[5:].strip()
-
-    # Drop "by <Month> <Day>" or "by <Month> <Day>, <Year>" tail
-    t = re.sub(r"\s+by\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+(?:,\s*\d{4})?$", "", t, flags=re.IGNORECASE)
-    # Drop "in <Year>" tail (e.g. "separate in 2026")
-    t = re.sub(r"\s+in\s+\d{4}$", "", t, flags=re.IGNORECASE)
-    # Drop "by <Year>" tail
-    t = re.sub(r"\s+by\s+\d{4}$", "", t, flags=re.IGNORECASE)
-    # Drop "before <Month> <Day>" tail
-    t = re.sub(r"\s+before\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+$", "", t, flags=re.IGNORECASE)
-
-    # Pattern: "<Subject> visit <Place>" -> "<Place> visit"
-    m = re.match(r"^(.+?)\s+visit\s+(?:the\s+)?(.+)$", t, flags=re.IGNORECASE)
-    if m:
-        subject, place = m.group(1), m.group(2)
-        t = f"{place} visit"
-
-    t = t.strip()
-
-    # If still too long, fall back to first 6 significant words
-    if len(t) > 40:
-        words = t.split()
-        t = " ".join(words[:6])
-
-    return t
-
-
-def _polymarket_top_markets(items: list[schema.SourceItem], limit: int = 3) -> list[str]:
-    """Build short summary strings for the top Polymarket markets by volume.
-
-    Returns list like: ['UK visit 5.5%', 'Israel visit 8%', 'blocked from entering 36%']
-    """
-    # Sort by volume descending
-    sorted_items = sorted(
-        items,
-        key=lambda it: it.engagement.get("volume") or 0,
-        reverse=True,
-    )
-
-    summaries: list[str] = []
-    for item in sorted_items[:limit]:
-        outcome_prices = item.metadata.get("outcome_prices") or []
-        if not outcome_prices:
-            continue
-
-        lead_name, lead_price = outcome_prices[0]
-        if not isinstance(lead_price, (int, float)):
-            continue
-
-        pct = f"{lead_price * 100:.0f}%" if lead_price >= 0.1 else f"{lead_price * 100:.1f}%"
-
-        descriptor = _shorten_polymarket_title(item.metadata.get("question") or item.title or "")
-        if not descriptor:
-            continue
-
-        # For binary Yes/No markets (lead_name == "Yes"), the "Yes" is implicit - omit it.
-        # For named outcomes (e.g. "Kanye" in a multi-way market), keep the outcome name.
-        if lead_name.lower() == "yes":
-            summaries.append(f"{descriptor} {pct}")
-        else:
-            summaries.append(f"{descriptor}: {lead_name} {pct}")
-
-    return summaries
 
 
 def _render_source_coverage(report: schema.Report) -> list[str]:
@@ -794,19 +706,6 @@ def _build_source_footer_lines(report: schema.Report) -> list[str]:
         stats = " │ ".join(parts)
         out.append(_footer_line_for_source(emoji, label, len(items), item_word, stats))
 
-    # Polymarket (special: count + odds string from existing helper)
-    polymarket_items = report.items_by_source.get("polymarket") or []
-    if polymarket_items:
-        odds = _polymarket_top_markets(polymarket_items, limit=3)
-        odds_str = ", ".join(odds) if odds else ""
-        count = len(polymarket_items)
-        count_str = f"{count:,}" if count >= 1000 else str(count)
-        plural = "markets" if count != 1 else "market"
-        if odds_str:
-            out.append(f"📊 Polymarket: {count_str} {plural} │ {odds_str}")
-        else:
-            out.append(f"📊 Polymarket: {count_str} {plural}")
-
     # Web (sources from grounding)
     web_items = report.items_by_source.get("grounding") or []
     if web_items:
@@ -914,19 +813,6 @@ def _render_stats(report: schema.Report) -> list[str]:
     if top_voices:
         lines.append(f"- Top voices: {', '.join(top_voices)}")
     for source, items in non_empty_sources.items():
-        if source == "polymarket":
-            # Polymarket gets a richer stats line with top market odds
-            market_summaries = _polymarket_top_markets(items)
-            if market_summaries:
-                label = f"{len(items)} market{'s' if len(items) != 1 else ''}"
-                parts_str = f"{label} | " + " | ".join(market_summaries)
-            else:
-                parts_str = f"{len(items)} market{'s' if len(items) != 1 else ''}"
-                engagement_summary = _aggregate_engagement(source, items)
-                if engagement_summary:
-                    parts_str += f" | {engagement_summary}"
-            lines.append(f"- {_source_label(source)}: {parts_str}")
-            continue
         parts = [f"{len(items)} item{'s' if len(items) != 1 else ''}"]
         engagement_summary = _aggregate_engagement(source, items)
         if engagement_summary:
@@ -996,7 +882,6 @@ ENGAGEMENT_DISPLAY: dict[str, list[tuple[str, str]]] = {
     "hackernews":   [("points", "pts"), ("comments", "cmt")],
     "bluesky":      [("likes", "likes"), ("reposts", "rt"), ("replies", "re")],
     "truthsocial":  [("likes", "likes"), ("reposts", "rt"), ("replies", "re")],
-    "polymarket":   [],
     "github":       [("reactions", "react"), ("comments", "cmt")],
     "perplexity":   [("citations", "cite")],
 }

@@ -48,7 +48,6 @@ def normalize_source_items(
         "threads": lambda s, i, idx, fd, td: _normalize_microblog(s, i, idx, fd, td, "TH", "Threads post"),
         "xquik": _normalize_x,
         "pinterest": _normalize_pinterest,
-        "polymarket": _normalize_polymarket,
         "grounding": _normalize_grounding,
         "xiaohongshu": _normalize_grounding,
         "github": _normalize_github,
@@ -392,43 +391,6 @@ def _normalize_microblog(
         why_relevant=str(item.get("why_relevant") or ""),
         metadata={"display_name": item.get("display_name")},
     )
-
-
-def _normalize_polymarket(
-    source: str,
-    item: dict[str, Any],
-    index: int,
-    from_date: str,
-    to_date: str,
-) -> schema.SourceItem:
-    title = str(item.get("title") or "").strip()
-    question = str(item.get("question") or "").strip()
-    engagement = {
-        "volume": item.get("volume1mo") or item.get("volume24hr") or 0,
-        "liquidity": item.get("liquidity") or 0,
-    }
-    return _source_item(
-        item_id=str(item.get("id") or f"PM{index + 1}"),
-        source=source,
-        title=title or question or f"Polymarket event {index + 1}",
-        body="\n".join(part for part in [title, question, str(item.get("price_movement") or "")] if part),
-        url=str(item.get("url") or ""),
-        author=None,
-        container="Polymarket",
-        published_at=item.get("date"),
-        date_confidence=_date_confidence(item, from_date, to_date, default="high"),
-        engagement=engagement,
-        relevance_hint=item.get("relevance", 0.5),
-        why_relevant=str(item.get("why_relevant") or ""),
-        snippet=str(item.get("price_movement") or ""),
-        metadata={
-            "question": question,
-            "end_date": item.get("end_date"),
-            "outcome_prices": item.get("outcome_prices") or [],
-            "outcomes_remaining": item.get("outcomes_remaining"),
-        },
-    )
-
 
 
 def _normalize_github(

@@ -485,14 +485,6 @@ def is_truthsocial_available(config: dict[str, Any]) -> bool:
     return bool(config.get('TRUTHSOCIAL_TOKEN'))
 
 
-def is_polymarket_available() -> bool:
-    """Check if Polymarket source is available.
-
-    Always returns True - Gamma API is free, no key needed.
-    """
-    return True
-
-
 def is_tiktok_available(config: dict[str, Any]) -> bool:
     """Check if TikTok source is available (ScrapeCreators or legacy Apify).
 

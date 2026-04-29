@@ -6,7 +6,7 @@ import re
 
 from . import dedupe, schema
 
-CLUSTERABLE_INTENTS = {"breaking_news", "opinion", "comparison", "prediction"}
+CLUSTERABLE_INTENTS = {"breaking_news", "opinion", "comparison"}
 
 # Words too common to signal shared topic between clusters.
 _ENTITY_STOPWORDS = frozenset({
@@ -198,15 +198,6 @@ def _merge_entity_clusters(
             sources_j = set(clusters[j].sources)
             if sources_i == sources_j and len(sources_i) == 1:
                 continue
-            # Prevent Polymarket clusters from merging with non-Polymarket
-            # clusters. Prediction markets about "Sam Altman equity" should not
-            # merge into a news cluster about "Sam Altman rivalry" just because
-            # both mention the same entity.
-            poly_i = "polymarket" in sources_i
-            poly_j = "polymarket" in sources_j
-            if poly_i != poly_j:
-                continue
-
             overlap = _entity_overlap(cluster_entities[i], cluster_entities[j])
             if overlap >= 0.45:
                 merged_into[j] = i

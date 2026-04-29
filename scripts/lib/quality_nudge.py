@@ -1,19 +1,18 @@
 """Post-research quality score and upgrade nudge.
 
-Computes a quality score based on 5 core sources and builds
+Computes a quality score based on 4 core sources and builds
 a nudge message describing what the user missed and how to fix it.
 """
 
 from typing import List
 
 
-# The 5 core sources
-CORE_SOURCES = ["hn", "polymarket", "x", "youtube", "reddit"]
+# The 4 core sources
+CORE_SOURCES = ["hn", "x", "youtube", "reddit"]
 
 # Labels for display
 SOURCE_LABELS = {
     "hn": "Hacker News",
-    "polymarket": "Polymarket",
     "x": "X/Twitter",
     "youtube": "YouTube",
     "reddit": "Reddit",
@@ -55,8 +54,8 @@ def compute_quality_score(config: dict, research_results: dict) -> dict:
 
     Returns:
         {
-            "score_pct": 40-100,
-            "core_active": ["hn", "polymarket", ...],
+            "score_pct": 25-100,
+            "core_active": ["hn", ...],
             "core_missing": ["x", "youtube"],
             "core_errored": [],  # configured but errored
             "nudge_text": "..." or None if 100%
@@ -66,9 +65,8 @@ def compute_quality_score(config: dict, research_results: dict) -> dict:
     core_missing: List[str] = []
     core_errored: List[str] = []
 
-    # HN, Polymarket, and Reddit are always active
+    # HN and Reddit are always active
     core_active.append("hn")
-    core_active.append("polymarket")
     core_active.append("reddit")
 
     # X
@@ -95,7 +93,7 @@ def compute_quality_score(config: dict, research_results: dict) -> dict:
         if has_ytdlp and research_results.get("youtube_error"):
             core_errored.append("youtube")
 
-    score_pct = int(len(core_active) / 5 * 100)
+    score_pct = int(len(core_active) / 4 * 100)
 
     has_sc = bool(config.get("SCRAPECREATORS_API_KEY"))
     active_sources = research_results.get("active_sources") or []
@@ -127,8 +125,8 @@ def _build_nudge_text(core_missing: List[str], core_errored: List[str], has_sc: 
         else:
             missed_parts.append(label)
 
-    active_count = 5 - len(core_missing)
-    lines.append(f"Research quality: {active_count}/5 core sources.")
+    active_count = 4 - len(core_missing)
+    lines.append(f"Research quality: {active_count}/4 core sources.")
     lines.append(f"Missing: {', '.join(missed_parts)}.")
     lines.append("")
 

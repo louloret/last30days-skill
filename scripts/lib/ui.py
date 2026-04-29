@@ -90,13 +90,6 @@ HN_MESSAGES = [
     "Discovering developer conversations...",
 ]
 
-POLYMARKET_MESSAGES = [
-    "Checking prediction markets...",
-    "Finding what people are betting on...",
-    "Scanning Polymarket for odds...",
-    "Discovering prediction markets...",
-]
-
 PROCESSING_MESSAGES = [
     "Crunching the data...",
     "Scoring and ranking...",
@@ -121,7 +114,6 @@ SOURCE_COMPLETION_ORDER = [
     "hackernews",
     "bluesky",
     "truthsocial",
-    "polymarket",
     "grounding",
     "xiaohongshu",
 ]
@@ -135,7 +127,6 @@ SOURCE_COMPLETION_META = {
     "hackernews": ("HN", "story", "stories", Colors.YELLOW),
     "bluesky": ("Bluesky", "post", "posts", Colors.BLUE),
     "truthsocial": ("Truth Social", "post", "posts", Colors.CYAN),
-    "polymarket": ("Polymarket", "market", "markets", Colors.GREEN),
     "grounding": ("Web", "result", "results", Colors.GREEN),
     "xiaohongshu": ("Xiaohongshu", "post", "posts", Colors.RED),
 }
@@ -183,7 +174,7 @@ I just researched that for you. Here's what I've got right now:
 
 {status_line}
 
-More sources means better research, but it works fine as-is. You can unlock more for free - log into x.com in your browser for X, and run `brew install yt-dlp` for YouTube transcripts. That gives you Reddit (with comments), X, YouTube, HN, and Polymarket - all free.
+More sources means better research, but it works fine as-is. You can unlock more for free - log into x.com in your browser for X, and run `brew install yt-dlp` for YouTube transcripts. That gives you Reddit (with comments), X, YouTube, and HN - all free.
 
 Some examples of what you can do:
 - "last30 what are people saying about Figma"
@@ -365,15 +356,6 @@ class ProgressDisplay:
         if self.spinner:
             self.spinner.stop(f"{Colors.YELLOW}HN{Colors.RESET} Found {count} stories")
 
-    def start_polymarket(self):
-        msg = random.choice(POLYMARKET_MESSAGES)
-        self.spinner = Spinner(f"{Colors.GREEN}Polymarket{Colors.RESET} {msg}", Colors.GREEN, quiet=True)
-        self.spinner.start()
-
-    def end_polymarket(self, count: int):
-        if self.spinner:
-            self.spinner.stop(f"{Colors.GREEN}Polymarket{Colors.RESET} Found {count} markets")
-
     def start_processing(self):
         msg = random.choice(PROCESSING_MESSAGES)
         self.spinner = Spinner(f"{Colors.PURPLE}Processing{Colors.RESET} {msg}", Colors.PURPLE)
@@ -389,7 +371,6 @@ class ProgressDisplay:
         x_count: int = 0,
         youtube_count: int = 0,
         hn_count: int = 0,
-        pm_count: int = 0,
         tiktok_count: int = 0,
         ig_count: int = 0,
         *,
@@ -405,7 +386,6 @@ class ProgressDisplay:
                 "tiktok": tiktok_count,
                 "instagram": ig_count,
                 "hackernews": hn_count,
-                "polymarket": pm_count,
             }
             if display_sources is None:
                 display_sources = [source for source, count in source_counts.items() if count]

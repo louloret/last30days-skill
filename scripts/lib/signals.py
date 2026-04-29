@@ -12,11 +12,10 @@ SOURCE_QUALITY = {
     "xiaohongshu": 0.7,
     "hackernews": 0.8,
     "youtube": 0.85,
-    "reddit": 0.6,
+    "reddit": 0.8,
     "x": 0.68,
     "bluesky": 0.66,
     "truthsocial": 0.6,
-    "polymarket": 0.5,
     "instagram": 0.58,
     "tiktok": 0.58,
 }
@@ -91,7 +90,6 @@ ENGAGEMENT_WEIGHTS: dict[str, list[tuple[str, float]]] = {
     "hackernews":   [("points", 0.55), ("comments", 0.45)],
     "bluesky":      [("likes", 0.40), ("reposts", 0.30), ("replies", 0.20), ("quotes", 0.10)],
     "truthsocial":  [("likes", 0.45), ("reposts", 0.30), ("replies", 0.25)],
-    "polymarket":   [("volume", 0.60), ("liquidity", 0.40)],
 }
 
 
