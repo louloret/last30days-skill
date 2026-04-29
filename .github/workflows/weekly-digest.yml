@@ -12,6 +12,7 @@ jobs:
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_TO: ${{ secrets.RESEND_TO }}
+      SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -26,13 +27,19 @@ jobs:
 
       - name: Run ecosystem digest
         run: |
+          cat > /tmp/plan.json << 'EOF'
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"claude-code","search_query":"claude code ai agent","ranking_query":"What are developers saying about Claude Code and AI coding agents this week?","sources":["reddit","hackernews"],"weight":1.0},{"label":"mcp-servers","search_query":"mcp server model context protocol","ranking_query":"What new MCP servers and integrations are developers building?","sources":["reddit","hackernews"],"weight":0.8},{"label":"ai-skills","search_query":"ai coding automation developer workflow","ranking_query":"What AI coding skills and developer automation workflows are trending?","sources":["reddit","hackernews"],"weight":0.6}]}
+          EOF
+
           NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
           HEADER="=== AI Ecosystem Digest · ${NOW} (last 7 days) ==="
           (
             echo "${HEADER}"
             python scripts/last30days.py "ai skills claude code mcp server" \
-              --agent --emit=compact --auto-resolve --days=7 \
-              --save-dir=/tmp/digests --save-suffix=ecosystem
+              --agent --emit=compact --days=7 \
+              --save-dir=/tmp/digests --save-suffix=ecosystem \
+              --subreddits=ClaudeAI,LocalLLaMA,MachineLearning,programming,devtools \
+              --plan "$(cat /tmp/plan.json)"
           ) | python digest/email_digest.py --terms "ai skills" "claude code" "mcp server"
 
   marketing:
