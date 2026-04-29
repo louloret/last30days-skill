@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Daily digest: AI marketing and growth."""
+"""Daily digest: AI marketing."""
 
 import argparse, subprocess, sys
 from datetime import datetime
@@ -24,7 +24,7 @@ header = f"=== AI Marketing & Growth Digest · {now} (last {args.days} days) ===
 print(header)
 
 result = subprocess.run(
-    ["python3.13", str(ENGINE), "ai marketing growth",
+    ["python3.13", str(ENGINE), "ai marketing",
      "--agent", "--emit=compact", "--auto-resolve",
      f"--days={args.days}", f"--save-dir={SAVE_DIR}", "--save-suffix=marketing"],
     text=True, capture_output=True
