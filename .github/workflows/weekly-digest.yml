@@ -49,6 +49,7 @@ jobs:
     env:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_TO: ${{ secrets.RESEND_TO }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -63,6 +64,17 @@ jobs:
 
       - name: Run marketing digest
         run: |
+          cat > /tmp/plan.json << 'EOF'
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"ai-marketing-tools","search_query":"ai marketing tools automation","ranking_query":"What AI marketing tools and automation are practitioners actually using this week?","sources":["reddit","hackernews"],"weight":1.0},{"label":"ai-growth","search_query":"ai growth saas customer acquisition","ranking_query":"What AI-powered growth strategies are founders and marketers sharing?","sources":["reddit","hackernews"],"weight":0.8},{"label":"ai-content","search_query":"ai content creation copywriting seo","ranking_query":"What are marketers saying about AI content creation and SEO tools?","sources":["reddit","hackernews"],"weight":0.6}]}
+          EOF
+
           NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
-          echo "=== AI Marketing Repos · ${NOW} ===" \
-            | python digest/email_digest.py --terms "ai marketing" "ai growth"
+          HEADER="=== AI Marketing Digest · ${NOW} (last 7 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "ai marketing tools growth automation" \
+              --agent --emit=compact --days=7 --quick \
+              --save-dir=/tmp/digests --save-suffix=marketing \
+              --subreddits=Entrepreneur,marketing,startups,SaaS,growmybusiness,digital_marketing \
+              --plan "$(cat /tmp/plan.json)"
+          ) | python digest/email_digest.py --terms "ai marketing" "ai growth"
