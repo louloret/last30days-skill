@@ -39,7 +39,7 @@ jobs:
             python scripts/last30days.py "ai skills claude code mcp server" \
               --agent --emit=compact --days=7 --quick \
               --save-dir=/tmp/digests --save-suffix=ecosystem \
-              --subreddits=ClaudeAI,LocalLLaMA,MachineLearning,programming,devtools,AI_Agents \
+              --subreddits=claudeskills,AI_Agents,AskVibeCoders,Entrepreneur,ClaudeAI \
               --plan "$(cat /tmp/plan.json)"
           ) | python digest/email_digest.py --terms "ai skills" "claude code" "mcp server"
 
