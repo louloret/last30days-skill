@@ -73,7 +73,7 @@ jobs:
           (
             echo "${HEADER}"
             python scripts/last30days.py "ai marketing tools" \
-              --agent --emit=compact --days=7 --quick \
+              --agent --emit=compact --days=14 \
               --save-dir=/tmp/digests --save-suffix=marketing \
               --subreddits=aiToolForBusiness,AskMarketing,generativeAI,DigitalMarketing,Entrepreneur,SaaS,ecommerce \
               --plan "$(cat /tmp/plan.json)"
