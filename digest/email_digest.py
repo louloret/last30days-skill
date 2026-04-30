@@ -24,10 +24,58 @@ def load_env():
                 k, _, v = line.partition("=")
                 env[k.strip()] = v.strip().strip('"').strip("'")
     # Fall back to environment variables for keys not found in the file
-    for key in ("RESEND_API_KEY", "RESEND_TO"):
+    for key in ("RESEND_API_KEY", "RESEND_TO", "ANTHROPIC_API_KEY"):
         if key not in env and key in os.environ:
             env[key] = os.environ[key]
     return env
+
+# ── Claude synthesis ─────────────────────────────────────────────────────────
+
+_SYNTHESIS_PROMPT = (
+    "You are synthesizing research engine output into a digest narrative. Follow these rules exactly.\n\n"
+    "Output format:\n"
+    "1. Start with `What I learned:` on its own line — nothing above it, no title\n"
+    "2. Write bold-lead-in paragraphs: each opens with **Bold theme** followed by supporting detail "
+    "with specific citations (subreddit names, upvote counts, comment counts, thread titles)\n"
+    "3. When Reddit AND Hacker News independently cover the same story, call it out as stronger signal\n"
+    "4. Write the prose label `KEY PATTERNS from the research:` followed by a numbered list\n"
+    "5. Copy the engine emoji-tree footer block (between `---` lines, starting with "
+    "`✅ All agents reported back!`) verbatim at the end\n\n"
+    "Non-negotiable rules:\n"
+    "- No em-dashes or en-dashes; use ` - ` (hyphen with spaces) instead\n"
+    "- No ## or ### section headers in the body\n"
+    "- No Sources block, References block, or trailing URL lists at the end\n"
+    "- Cite specific data from the engine output: upvote counts, comment counts, subreddit names, thread titles\n\n"
+    "Engine output to synthesize:\n"
+)
+
+
+def synthesize(text, api_key):
+    if not api_key:
+        return None
+    payload = json.dumps({
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": _SYNTHESIS_PROMPT + text}],
+    }).encode()
+    req = Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+            return data["content"][0]["text"]
+    except Exception as e:
+        print(f"Synthesis skipped: {e}", file=sys.stderr)
+        return None
+
 
 # ── GitHub repo fetching ────────────────────────────────────────────────────
 
@@ -192,9 +240,15 @@ def main():
     first_line = body.splitlines()[0].strip().strip("=").strip()
     subject = first_line if first_line else f"AI Digest · {datetime.now().strftime('%Y-%m-%d')}"
 
+    anthropic_key = env.get("ANTHROPIC_API_KEY")
+    synthesized = synthesize(body, anthropic_key)
+    if synthesized:
+        print("Synthesis: ok", file=sys.stderr)
+    display_body = synthesized if synthesized else body
+
     repos = fetch_top_repos(args.terms) if args.terms else []
-    html  = build_html(subject, body, repos)
-    result = send(api_key, to, subject, body, html)
+    html  = build_html(subject, display_body, repos)
+    result = send(api_key, to, subject, display_body, html)
     print(f"Sent: {result.get('id', 'ok')} → {to}")
 
 if __name__ == "__main__":
