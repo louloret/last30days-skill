@@ -23,11 +23,14 @@ def load_env():
             if line and not line.startswith("#") and "=" in line:
                 k, _, v = line.partition("=")
                 env[k.strip()] = v.strip().strip('"').strip("'")
-    # Fall back to environment variables for keys not found in the file
     for key in ("RESEND_API_KEY", "RESEND_TO", "ANTHROPIC_API_KEY"):
         if key not in env and key in os.environ:
             env[key] = os.environ[key]
     return env
+
+def load_subscribers(path):
+    lines = Path(path).read_text().splitlines()
+    return [l.strip() for l in lines if l.strip() and not l.startswith("#")]
 
 # ── Claude synthesis ─────────────────────────────────────────────────────────
 
@@ -224,14 +227,26 @@ def send(api_key, to, subject, text_body, html_body):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--terms", nargs="*", default=[], help="GitHub search terms for repo section")
+    parser.add_argument("--subscribers-file", help="Path to subscribers list (one email per line)")
     args = parser.parse_args()
 
     env = load_env()
     api_key = env.get("RESEND_API_KEY")
-    to      = env.get("RESEND_TO")
-    if not api_key or not to:
-        print("ERROR: RESEND_API_KEY and RESEND_TO must be set in ~/.config/last30days/.env", file=sys.stderr)
+    if not api_key:
+        print("ERROR: RESEND_API_KEY must be set", file=sys.stderr)
         sys.exit(1)
+
+    if args.subscribers_file:
+        recipients = load_subscribers(args.subscribers_file)
+        if not recipients:
+            print("ERROR: subscribers file is empty", file=sys.stderr)
+            sys.exit(1)
+    else:
+        to = env.get("RESEND_TO")
+        if not to:
+            print("ERROR: RESEND_TO must be set or --subscribers-file provided", file=sys.stderr)
+            sys.exit(1)
+        recipients = [to]
 
     body = sys.stdin.read()
     if not body.strip():
@@ -248,8 +263,9 @@ def main():
 
     repos = fetch_top_repos(args.terms) if args.terms else []
     html  = build_html(subject, display_body, repos)
-    result = send(api_key, to, subject, display_body, html)
-    print(f"Sent: {result.get('id', 'ok')} → {to}")
+    for recipient in recipients:
+        result = send(api_key, recipient, subject, display_body, html)
+        print(f"Sent: {result.get('id', 'ok')} → {recipient}")
 
 if __name__ == "__main__":
     main()
