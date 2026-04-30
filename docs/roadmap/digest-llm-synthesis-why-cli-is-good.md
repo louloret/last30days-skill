@@ -1,3 +1,4 @@
+
 # Why the CLI Output Is So Good (and How to Replicate It in Email)
 
 ## The Two-Stage Pipeline

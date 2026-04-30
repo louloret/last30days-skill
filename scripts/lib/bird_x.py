@@ -11,6 +11,8 @@ import signal
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 from . import http, log
@@ -39,6 +41,11 @@ DEPTH_CONFIG = {
 
 # Module-level credentials injected from .env config
 _credentials: Dict[str, str] = {}
+
+# Serialise X searches and enforce a minimum gap to avoid rate limiting
+_search_lock = threading.Lock()
+_last_search_time: float = 0.0
+_MIN_SEARCH_DELAY = 5.0  # seconds between consecutive X searches
 
 
 def set_credentials(auth_token: Optional[str], ct0: Optional[str]):
@@ -243,8 +250,18 @@ def search_x(
     Returns:
         Raw Bird JSON response or error dict.
     """
+    global _last_search_time
+
     count = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["default"])
     timeout = 30 if depth == "quick" else 45 if depth == "default" else 60
+
+    # Serialise X searches and enforce minimum gap between requests
+    with _search_lock:
+        wait = _MIN_SEARCH_DELAY - (time.time() - _last_search_time)
+        if wait > 0:
+            _log(f"Throttling: waiting {wait:.1f}s before next X search")
+            time.sleep(wait)
+        _last_search_time = time.time()
 
     # Extract core subject - X search is literal, not semantic
     core_topic = _extract_core_subject(topic)
@@ -253,42 +270,21 @@ def search_x(
     _log(f"Searching: {query}")
     response = _run_bird_search(query, count, timeout)
 
-    # Check if we got results
-    items = parse_bird_response(response, query=core_topic)
+    # Bail out immediately on rate limit so pipeline can mark X as exhausted
+    err = response.get("error", "") if isinstance(response, dict) else ""
+    if err and ("429" in err or "rate limit" in err.lower()):
+        raise RuntimeError(f"429 rate limit from X: {err}")
 
-    # Retry with OR groups for multi-word queries (X supports OR operator)
+    # Check if we got results; one OR-group retry for multi-word queries
+    items = parse_bird_response(response, query=core_topic)
     core_words = core_topic.split()
     if not items and len(core_words) >= 2:
         from .query import extract_compound_terms
         compounds = extract_compound_terms(topic)
         if compounds:
-            # Build OR-group query: ("multi-agent" OR "agent simulation") since:DATE
             or_parts = ' OR '.join(f'"{t}"' for t in compounds[:3])
             _log(f"0 results for '{core_topic}', retrying with OR groups: {or_parts}")
             query = f"({or_parts}) since:{from_date}"
-            response = _run_bird_search(query, count, timeout)
-            items = parse_bird_response(response, query=core_topic)
-
-    # Retry with fewer keywords if still 0 results and query has 3+ words
-    if not items and len(core_words) > 2:
-        shorter = ' '.join(core_words[:2])
-        _log(f"0 results for '{core_topic}', retrying with '{shorter}'")
-        query = f"{shorter} since:{from_date}"
-        response = _run_bird_search(query, count, timeout)
-        items = parse_bird_response(response, query=core_topic)
-
-    # Last-chance retry: use strongest remaining token (often the product name)
-    if not items and core_words:
-        low_signal = {
-            'trendiest', 'trending', 'hottest', 'hot', 'popular', 'viral',
-            'best', 'top', 'latest', 'new', 'plugin', 'plugins',
-            'skill', 'skills', 'tool', 'tools',
-        }
-        candidates = [w for w in core_words if w not in low_signal]
-        if candidates:
-            strongest = max(candidates, key=len)
-            _log(f"0 results for '{core_topic}', retrying with strongest token '{strongest}'")
-            query = f"{strongest} since:{from_date}"
             response = _run_bird_search(query, count, timeout)
 
     return response
