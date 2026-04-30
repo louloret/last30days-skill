@@ -65,16 +65,16 @@ jobs:
       - name: Run marketing digest
         run: |
           cat > /tmp/plan.json << 'EOF'
-          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"ai-marketing-tools","search_query":"ai marketing tools automation","ranking_query":"What AI marketing tools and automation are practitioners actually using this week?","sources":["reddit","hackernews"],"weight":1.0},{"label":"ai-growth","search_query":"ai growth saas customer acquisition","ranking_query":"What AI-powered growth strategies are founders and marketers sharing?","sources":["reddit","hackernews"],"weight":0.8},{"label":"ai-content","search_query":"ai content creation copywriting seo","ranking_query":"What are marketers saying about AI content creation and SEO tools?","sources":["reddit","hackernews"],"weight":0.6}]}
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"ai-tools-daily","search_query":"ai marketing tools actually using","ranking_query":"What AI marketing tools are practitioners actually using every day, not just testing?","sources":["reddit","hackernews"],"weight":1.0},{"label":"ai-video-marketing","search_query":"ai video tools short form content marketing","ranking_query":"What AI video tools are marketers using for TikTok, Reels, and short-form content?","sources":["reddit","hackernews"],"weight":0.9},{"label":"ai-growth-automation","search_query":"ai marketing automation workflow growth","ranking_query":"What AI automation and workflow tools are saving marketers the most time?","sources":["reddit","hackernews"],"weight":0.7}]}
           EOF
 
           NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
           HEADER="=== AI Marketing Digest · ${NOW} (last 7 days) ==="
           (
             echo "${HEADER}"
-            python scripts/last30days.py "ai marketing tools growth automation" \
+            python scripts/last30days.py "ai marketing tools" \
               --agent --emit=compact --days=7 --quick \
               --save-dir=/tmp/digests --save-suffix=marketing \
-              --subreddits=Entrepreneur,marketing,startups,SaaS,growmybusiness,digital_marketing \
+              --subreddits=aiToolForBusiness,AskMarketing,generativeAI,digital_marketing,Entrepreneur,SaaS \
               --plan "$(cat /tmp/plan.json)"
           ) | python digest/email_digest.py --terms "ai marketing" "ai growth"
