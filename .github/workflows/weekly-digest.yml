@@ -75,6 +75,6 @@ jobs:
             python scripts/last30days.py "ai marketing tools" \
               --agent --emit=compact --days=7 --quick \
               --save-dir=/tmp/digests --save-suffix=marketing \
-              --subreddits=aiToolForBusiness,AskMarketing,generativeAI,digital_marketing,Entrepreneur,SaaS \
+              --subreddits=aiToolForBusiness,AskMarketing,generativeAI,DigitalMarketing,Entrepreneur,SaaS,ecommerce \
               --plan "$(cat /tmp/plan.json)"
           ) | python digest/email_digest.py --terms "ai marketing" "ai growth"
