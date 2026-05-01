@@ -64,7 +64,7 @@ def synthesize(text, api_key):
         return None
     payload = json.dumps({
         "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 1536,
+        "max_tokens": 3000,
         "messages": [{"role": "user", "content": _SYNTHESIS_PROMPT + text}],
     }).encode()
     req = Request(
