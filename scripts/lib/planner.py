@@ -440,7 +440,7 @@ def _default_source_weights(intent: str, sources: list[str]) -> dict[str, float]
             if source in base:
                 base[source] += bonus
     elif intent == "product":
-        for source, bonus in {"reddit": 1.2, "youtube": 0.8}.items():
+        for source, bonus in {"reddit": 1.5, "hackernews": 0.3, "youtube": 0.8, "x": -0.3}.items():
             if source in base:
                 base[source] += bonus
     elif intent == "concept":
