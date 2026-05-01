@@ -215,7 +215,14 @@ def _run_bird_search(query: str, count: int, timeout: int) -> Dict[str, Any]:
                 pass
 
         if proc.returncode != 0:
-            error = stderr.strip() if stderr else "Bird search failed"
+            # Bird outputs error JSON to stdout even on failure
+            out = stdout.strip() if stdout else ""
+            try:
+                parsed_err = json.loads(out) if out else {}
+                error = parsed_err.get("error") or stderr.strip() or "Bird search failed"
+            except Exception:
+                error = stderr.strip() or out or "Bird search failed"
+            _log(f"Search failed (exit {proc.returncode}): {error}")
             return {"error": error, "items": []}
 
         output = stdout.strip() if stdout else ""

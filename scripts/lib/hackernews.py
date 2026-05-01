@@ -86,8 +86,8 @@ def search_hackernews(
     from_ts = _date_to_unix(from_date)
     to_ts = _date_to_unix(to_date) + 86400  # Include the end date
 
-    # Use extracted core subject instead of raw topic for cleaner Algolia matching
-    core = extract_core_subject(topic)
+    # Algolia uses AND matching — cap to 3 words so multi-word subqueries don't return 0
+    core = extract_core_subject(topic, max_words=3)
     _log(f"Searching for '{core}' (raw: '{topic}', since {from_date}, count={count})")
 
     # Use relevance-sorted search with minimum engagement filter.
@@ -120,25 +120,17 @@ def search_hackernews(
 def _title_matches_query(title: str, query: str, author: str = "") -> bool:
     """Check if the query term appears in the title content, not just an HN prefix or author.
 
-    Returns True if the query (or any multi-word token) appears in the title
-    after stripping "Tell HN:", "Show HN:", "Ask HN:", "Launch HN:" prefixes
-    and ignoring the author name.  Returns True when query is empty (no filter).
+    Returns True if at least one query word appears in the title after stripping
+    "Tell HN:", "Show HN:", "Ask HN:", "Launch HN:" prefixes. Returns True when
+    query is empty (no filter). Uses OR semantics so multi-word queries like
+    "claude code ai agent" don't require all words in the title.
     """
     if not query:
         return True
     stripped = _HN_PREFIXES.sub("", title).strip()
-    # Also check that the match isn't solely in the author's username
     check_text = stripped.lower()
-    query_lower = query.lower()
-    # Check each word of the query independently; all must appear somewhere
-    # in the stripped title (not just the prefix).
-    query_words = query_lower.split()
-    for word in query_words:
-        if word in check_text:
-            continue
-        # Word not found in stripped title — reject
-        return False
-    return True
+    query_words = query.lower().split()
+    return any(word in check_text for word in query_words)
 
 
 def parse_hackernews_response(response: Dict[str, Any], query: str = "") -> List[Dict[str, Any]]:
