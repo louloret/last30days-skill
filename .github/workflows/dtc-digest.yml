@@ -57,7 +57,7 @@ jobs:
           HEADER="=== DTC Marketing Digest · ${NOW} (last 7 days) ==="
           (
             echo "${HEADER}"
-            python scripts/last30days.py "dtc marketing" \
+            python scripts/last30days.py "ecommerce marketing" \
               --agent --emit=compact --days=7 --quick \
               --save-dir=/tmp/digests --save-suffix=dtc \
               --subreddits=ecommerce,Entrepreneur,shopify,DigitalMarketing,dtcmarketing,smallbusiness \
