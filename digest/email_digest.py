@@ -53,12 +53,18 @@ _SYNTHESIS_PROMPT = (
 )
 
 
+def _extract_footer(body: str) -> str | None:
+    """Pull the ✅ footer block out of render_compact output so we can reattach it after synthesis."""
+    match = re.search(r'---\n✅ All agents reported back!.*?---', body, re.DOTALL)
+    return match.group(0) if match else None
+
+
 def synthesize(text, api_key):
     if not api_key:
         return None
     payload = json.dumps({
         "model": "claude-haiku-4-5-20251001",
-        "max_tokens": 1024,
+        "max_tokens": 1536,
         "messages": [{"role": "user", "content": _SYNTHESIS_PROMPT + text}],
     }).encode()
     req = Request(
@@ -256,9 +262,12 @@ def main():
     subject = first_line if first_line else f"AI Digest · {datetime.now().strftime('%Y-%m-%d')}"
 
     anthropic_key = env.get("ANTHROPIC_API_KEY")
+    footer = _extract_footer(body)
     synthesized = synthesize(body, anthropic_key)
     if synthesized:
         print("Synthesis: ok", file=sys.stderr)
+        if footer and "✅ All agents reported back!" not in synthesized:
+            synthesized = synthesized.rstrip() + "\n\n" + footer + "\n"
     display_body = synthesized if synthesized else body
 
     repos = fetch_top_repos(args.terms) if args.terms else []
