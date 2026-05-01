@@ -54,11 +54,11 @@ jobs:
           EOF
 
           NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
-          HEADER="=== DTC Marketing Digest · ${NOW} (last 14 days) ==="
+          HEADER="=== DTC Marketing Digest · ${NOW} (last 30 days) ==="
           (
             echo "${HEADER}"
             python scripts/last30days.py "dtc marketing" \
-              --agent --emit=compact --days=14 --quick \
+              --agent --emit=compact --days=30 --quick \
               --save-dir=/tmp/digests --save-suffix=dtc \
               --subreddits=ecommerce,Entrepreneur,shopify,DigitalMarketing,dtcmarketing,smallbusiness \
               --plan "$(cat /tmp/plan.json)"
