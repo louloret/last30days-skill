@@ -6,6 +6,7 @@ See scripts/lib/vendor/bird-search/package.json for authoritative version.
 """
 
 import json
+import math
 import os
 import signal
 import shutil
@@ -272,7 +273,11 @@ def search_x(
 
     # Extract core subject - X search is literal, not semantic
     core_topic = _extract_core_subject(topic)
-    query = f"{core_topic} since:{from_date}"
+
+    # Quality filter: drop low-engagement tweets and replies at the API level
+    min_faves = {"quick": 3, "default": 5, "deep": 10}.get(depth, 5)
+    quality_filter = f"min_faves:{min_faves} -filter:replies"
+    query = f"{core_topic} since:{from_date} {quality_filter}"
 
     _log(f"Searching: {query}")
     response = _run_bird_search(query, count, timeout)
@@ -291,7 +296,7 @@ def search_x(
         if compounds:
             or_parts = ' OR '.join(f'"{t}"' for t in compounds[:3])
             _log(f"0 results for '{core_topic}', retrying with OR groups: {or_parts}")
-            query = f"({or_parts}) since:{from_date}"
+            query = f"({or_parts}) since:{from_date} {quality_filter}"
             response = _run_bird_search(query, count, timeout)
 
     return response
@@ -460,6 +465,16 @@ def parse_bird_response(response: Dict[str, Any], query: str = "") -> List[Dict[
                 except (ValueError, TypeError):
                     engagement[key] = None
 
+        # Engagement-aware relevance: blend keyword match + position + likes
+        likes = engagement.get("likes") or 0
+        engagement_boost = min(0.2, math.log1p(likes) / 50)
+        rank_score = max(0.3, 1.0 - (i * 0.02))
+        if query:
+            content_score = _compute_relevance(query, str(tweet.get("text", "")))
+            relevance = round(min(1.0, 0.5 * content_score + 0.3 * rank_score + engagement_boost), 2)
+        else:
+            relevance = round(min(1.0, rank_score * 0.8 + engagement_boost), 2)
+
         # Build normalized item
         item = {
             "id": f"X{i+1}",
@@ -469,7 +484,7 @@ def parse_bird_response(response: Dict[str, Any], query: str = "") -> List[Dict[
             "date": date,
             "engagement": engagement if any(v is not None for v in engagement.values()) else None,
             "why_relevant": "",  # Bird doesn't provide relevance explanations
-            "relevance": _compute_relevance(query, str(tweet.get("text", ""))) if query else 0.7,
+            "relevance": relevance,
         }
 
         items.append(item)
