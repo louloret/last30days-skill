@@ -1,0 +1,66 @@
+name: DTC Marketing Digest
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"   # Every Monday at 8am UTC
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Send only to RESEND_TO instead of full subscriber list'
+        type: boolean
+        default: true
+
+jobs:
+  dtc:
+    name: DTC Marketing Digest
+    runs-on: ubuntu-latest
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_TO: ${{ secrets.RESEND_TO }}
+      SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GH_SUBSCRIBERS_TOKEN: ${{ secrets.GH_SUBSCRIBERS_TOKEN }}
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      CT0: ${{ secrets.CT0 }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch subscribers
+        run: |
+          if [ "${{ github.event.inputs.test_mode }}" = "true" ]; then
+            echo "$RESEND_TO" > /tmp/subscribers.txt
+          else
+            curl -f -s \
+              -H "Authorization: Bearer $GH_SUBSCRIBERS_TOKEN" \
+              -H "Accept: application/vnd.github.v3.raw" \
+              "https://api.github.com/repos/louloret/last30days-subscribers/contents/dtc-subscribers.txt" \
+              > /tmp/subscribers.txt
+          fi
+          echo "Subscribers: $(wc -l < /tmp/subscribers.txt)"
+
+      - name: Run DTC digest
+        run: |
+          cat > /tmp/plan.json << 'EOF'
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"dtc-tools","search_query":"dtc ecommerce tools stack klaviyo triple whale northbeam","ranking_query":"What tools are DTC brands actually using — attribution, email/SMS, analytics, retention?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"dtc-paid-creative","search_query":"dtc paid social creative ads facebook tiktok ugc","ranking_query":"What ad creative strategies and paid social tactics are DTC marketers seeing results with?","sources":["reddit","x"],"weight":0.9},{"label":"dtc-retention","search_query":"dtc email sms retention ltv repeat purchase shopify","ranking_query":"What retention and LTV strategies are DTC brands deploying via email and SMS?","sources":["reddit","hackernews"],"weight":0.8}]}
+          EOF
+
+          NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
+          HEADER="=== DTC Marketing Digest · ${NOW} (last 7 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "dtc marketing" \
+              --agent --emit=compact --days=7 --quick \
+              --save-dir=/tmp/digests --save-suffix=dtc \
+              --subreddits=ecommerce,Entrepreneur,shopify,DigitalMarketing,dtcmarketing,smallbusiness \
+              --plan "$(cat /tmp/plan.json)"
+          ) | python digest/email_digest.py --terms "dtc" "ecommerce" "klaviyo" "triple whale" \
+              --subscribers-file /tmp/subscribers.txt
