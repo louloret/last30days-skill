@@ -7,10 +7,14 @@ is not set or the API call fails. Results are cached in-process by topic+date.
 
 import json
 import os
+import re
 from typing import Optional
 from urllib.request import Request, urlopen
 
 from . import log
+
+# Strip any filter operators Claude adds despite prompt instructions
+_OPERATOR_RE = re.compile(r'\b(since|until|min_faves|min_retweets|lang|filter|-filter):\S*', re.IGNORECASE)
 
 _cache: dict[str, str] = {}
 
@@ -64,7 +68,8 @@ def _call_claude(prompt: str) -> Optional[str]:
     try:
         with urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
-            return data["content"][0]["text"].strip()
+            raw = data["content"][0]["text"].strip()
+            return _OPERATOR_RE.sub("", raw).strip() or None
     except Exception as e:
         log.debug(f"smart_query API call failed: {e}")
         return None
