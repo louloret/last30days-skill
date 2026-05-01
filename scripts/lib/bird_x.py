@@ -271,13 +271,21 @@ def search_x(
             time.sleep(wait)
         _last_search_time = time.time()
 
-    # Extract core subject - X search is literal, not semantic
-    core_topic = _extract_core_subject(topic)
-
     # Quality filter: drop low-engagement tweets and replies at the API level
     min_faves = {"quick": 3, "default": 5, "deep": 10}.get(depth, 5)
     quality_filter = f"min_faves:{min_faves} -filter:replies"
-    query = f"{core_topic} since:{from_date} {quality_filter}"
+
+    # Build OR-grouped phrase query upfront for broader recall.
+    # Literal AND matching ("claude code ai agent") misses tweets that use
+    # any subset of the terms; OR phrases catch more natural language variation.
+    from .query import extract_compound_terms
+    core_topic = _extract_core_subject(topic)
+    compounds = extract_compound_terms(topic)
+    if compounds:
+        or_parts = ' OR '.join(f'"{t}"' for t in compounds[:3])
+        query = f"({or_parts}) since:{from_date} {quality_filter}"
+    else:
+        query = f"{core_topic} since:{from_date} {quality_filter}"
 
     _log(f"Searching: {query}")
     response = _run_bird_search(query, count, timeout)
@@ -287,17 +295,12 @@ def search_x(
     if err and ("429" in err or "rate limit" in err.lower()):
         raise RuntimeError(f"429 rate limit from X: {err}")
 
-    # Check if we got results; one OR-group retry for multi-word queries
+    # Fall back to bare core subject if OR query returned nothing
     items = parse_bird_response(response, query=core_topic)
-    core_words = core_topic.split()
-    if not items and len(core_words) >= 2:
-        from .query import extract_compound_terms
-        compounds = extract_compound_terms(topic)
-        if compounds:
-            or_parts = ' OR '.join(f'"{t}"' for t in compounds[:3])
-            _log(f"0 results for '{core_topic}', retrying with OR groups: {or_parts}")
-            query = f"({or_parts}) since:{from_date} {quality_filter}"
-            response = _run_bird_search(query, count, timeout)
+    if not items and compounds:
+        _log(f"0 results for OR groups, retrying with core: '{core_topic}'")
+        query = f"{core_topic} since:{from_date} {quality_filter}"
+        response = _run_bird_search(query, count, timeout)
 
     return response
 
