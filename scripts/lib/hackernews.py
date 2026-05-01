@@ -86,8 +86,10 @@ def search_hackernews(
     from_ts = _date_to_unix(from_date)
     to_ts = _date_to_unix(to_date) + 86400  # Include the end date
 
-    # Algolia uses AND matching — cap to 3 words so multi-word subqueries don't return 0
-    core = extract_core_subject(topic, max_words=3)
+    # Claude generates an optimal Algolia query; fall back to 3-word core extract
+    from .smart_query import build_hn_query
+    smart = build_hn_query(topic, from_date, to_date)
+    core = smart if smart else extract_core_subject(topic, max_words=3)
     _log(f"Searching for '{core}' (raw: '{topic}', since {from_date}, count={count})")
 
     # Use relevance-sorted search with minimum engagement filter.
