@@ -19,7 +19,7 @@ ALLOWED_INTENTS = {
 ALLOWED_CLUSTER_MODES = {"none", "story", "workflow", "market", "debate"}
 QUICK_SOURCE_PRIORITY = {
     "factual": ["hackernews", "reddit", "x", "youtube"],
-    "product": ["youtube", "reddit", "x", "tiktok"],
+    "product": ["youtube", "reddit", "x", "tiktok", "hackernews"],
     "concept": ["hackernews", "reddit", "x", "youtube"],
     "opinion": ["reddit", "x", "youtube", "hackernews"],
     "how_to": ["youtube", "reddit", "x", "hackernews"],
@@ -38,7 +38,7 @@ SOURCE_PRIORITY = {
 SOURCE_LIMITS = {
     "quick": {
         "factual": 2,
-        "product": 2,
+        "product": 3,
         "concept": 2,
         "opinion": 2,
         "how_to": 2,
