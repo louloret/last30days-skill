@@ -2,7 +2,7 @@ name: Weekly AI Digest
 
 on:
   schedule:
-    - cron: "0 8 * * 1"   # Every Monday at 8am UTC
+    - cron: "30 10 * * 1"  # Every Monday at 6:30am EDT (10:30am UTC)
   workflow_dispatch:
     inputs:
       test_mode:
