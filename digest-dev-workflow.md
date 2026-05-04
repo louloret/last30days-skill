@@ -77,6 +77,19 @@ gh workflow run weekly-digest.yml --repo louloret/last30days-skill --ref custom 
 
 ---
 
+## Email sections
+
+The digest email renders two GitHub repo sections (requires `--terms`):
+
+| Section | Source | Ranking |
+|---------|--------|---------|
+| 🌟 Trending GitHub Repos | Repos created within `--trending-days` (default 7), sorted by stars | Newest repos gaining the most stars |
+| 🔥 Top GitHub Repos | All-time top repos by topic, top 10 | `log10(stars) × 3 + recency` blend |
+
+Pass `--trending-days` to `email_digest.py` to match the digest window (e.g. `--trending-days 14` for the marketing digest).
+
+---
+
 ## Key files
 
 | File | Purpose |

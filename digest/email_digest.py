@@ -132,6 +132,20 @@ def fetch_top_repos(terms, top_n=10):
                   key=lambda r: math.log10(r["stargazers_count"] + 1) * 3 + recency(r["pushed_at"]),
                   reverse=True)[:top_n]
 
+def fetch_trending_repos(terms, days=7, top_n=5):
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    all_items = {}
+    for term in terms:
+        q = f"{term}+created:>{cutoff}"
+        for item in gh_fetch(q, "stars"):
+            fn = item["full_name"]
+            if fn not in all_items:
+                all_items[fn] = item
+    return sorted(all_items.values(),
+                  key=lambda r: r["stargazers_count"],
+                  reverse=True)[:top_n]
+
 # ── HTML conversion ─────────────────────────────────────────────────────────
 
 def _inline(text):
@@ -173,7 +187,7 @@ def txt_to_html(text):
     if in_list: out.append("</ul>")
     return "\n".join(out)
 
-def repos_to_html(repos):
+def repos_to_html(repos, title="🔥 Top GitHub Repos"):
     if not repos:
         return ""
     rows = ""
@@ -190,18 +204,19 @@ def repos_to_html(repos):
             f"</tr>"
         )
     return (
-        "<h2>🔥 Top GitHub Repos</h2>"
+        f"<h2>{title}</h2>"
         "<table style='border-collapse:collapse;width:100%;font-size:14px;font-family:-apple-system,sans-serif;'>"
         f"{rows}"
         "</table>"
     )
 
-def build_html(subject, body_text, repos):
+def build_html(subject, body_text, trending_repos, top_repos, trending_days=7):
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#24292e;line-height:1.6;">
 <h1 style="border-bottom:2px solid #e1e4e8;padding-bottom:12px;font-size:1.4em;">{subject}</h1>
 {txt_to_html(body_text)}
-{repos_to_html(repos)}
+{repos_to_html(trending_repos, title=f"🌟 Trending GitHub Repos (last {trending_days} days)")}
+{repos_to_html(top_repos)}
 <hr>
 <p style="color:#999;font-size:11px;">AI Digest · <a href="https://github.com/louloret/last30days-skill" style="color:#999;">last30days</a></p>
 </body></html>"""
@@ -233,7 +248,9 @@ def send(api_key, to, subject, text_body, html_body):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--terms", nargs="*", default=[], help="GitHub search terms for repo section")
+    parser.add_argument("--trending-days", type=int, default=7, help="Window for trending repos (default: 7)")
     parser.add_argument("--subscribers-file", help="Path to subscribers list (one email per line)")
+    parser.add_argument("--save-md", help="Write the emailed markdown body to this file path")
     args = parser.parse_args()
 
     env = load_env()
@@ -270,11 +287,16 @@ def main():
             synthesized = synthesized.rstrip() + "\n\n" + footer + "\n"
     display_body = synthesized if synthesized else body
 
-    repos = fetch_top_repos(args.terms) if args.terms else []
-    html  = build_html(subject, display_body, repos)
+    trending = fetch_trending_repos(args.terms, days=args.trending_days) if args.terms else []
+    top_repos = fetch_top_repos(args.terms) if args.terms else []
+    html  = build_html(subject, display_body, trending, top_repos, trending_days=args.trending_days)
     for recipient in recipients:
         result = send(api_key, recipient, subject, display_body, html)
         print(f"Sent: {result.get('id', 'ok')} → {recipient}")
+
+    if args.save_md:
+        Path(args.save_md).write_text(display_body, encoding="utf-8")
+        print(f"Saved: {args.save_md}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
