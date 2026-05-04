@@ -20,6 +20,7 @@ jobs:
       SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GH_SUBSCRIBERS_TOKEN: ${{ secrets.GH_SUBSCRIBERS_TOKEN }}
+      GH_DIGESTS_TOKEN: ${{ secrets.GH_DIGESTS_TOKEN }}
       AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
       CT0: ${{ secrets.CT0 }}
     steps:
@@ -63,4 +64,26 @@ jobs:
               --subreddits=ecommerce,Entrepreneur,shopify,DigitalMarketing,dtcmarketing,smallbusiness \
               --plan "$(cat /tmp/plan.json)"
           ) | python digest/email_digest.py --terms "dtc" "ecommerce" "klaviyo" "triple whale" \
-              --subscribers-file /tmp/subscribers.txt
+              --subscribers-file /tmp/subscribers.txt \
+              --save-md /tmp/digest.md
+
+      - name: Publish to agentic-digests
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GH_DIGESTS_TOKEN }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          FILE_PATH="dtc-marketing/${DATE}.md"
+          CONTENT=$(base64 -w0 /tmp/digest.md)
+          SHA=$(gh api "/repos/louloret/agentic-digests/contents/${FILE_PATH}" --jq '.sha' 2>/dev/null || echo "")
+          if [ -n "$SHA" ]; then
+            gh api --method PUT "/repos/louloret/agentic-digests/contents/${FILE_PATH}" \
+              --field "message=digest: dtc-marketing ${DATE}" \
+              --field "content=${CONTENT}" \
+              --field "sha=${SHA}" --silent
+          else
+            gh api --method PUT "/repos/louloret/agentic-digests/contents/${FILE_PATH}" \
+              --field "message=digest: dtc-marketing ${DATE}" \
+              --field "content=${CONTENT}" --silent
+          fi
+          echo "Published: ${FILE_PATH}"
