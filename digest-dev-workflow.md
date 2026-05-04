@@ -2,10 +2,11 @@
 
 ## How the digest runs
 
-Two GitHub Actions jobs fire every Monday at 8am UTC (or manually via workflow_dispatch):
+Three GitHub Actions jobs fire every Monday at 10:30am UTC / 6:30am EDT (or manually via workflow_dispatch):
 
 - **AI Ecosystem Digest** — covers claude code, MCP servers, AI developer tools
 - **AI Marketing Digest** — covers AI marketing tools, video, growth automation
+- **DTC Marketing Digest** — covers DTC ecommerce, paid social, retention/LTV
 
 Each job:
 1. Fetches the subscriber list from a private GitHub repo
@@ -13,8 +14,12 @@ Each job:
 3. Pipes the compact research output through `digest/email_digest.py`
 4. Claude Haiku synthesizes the output into a narrative
 5. Resend delivers the email to subscribers
+6. Saves the rendered markdown to `louloret/agentic-digests` (via `GH_DIGESTS_TOKEN`)
 
-Workflow file: `.github/workflows/weekly-digest.yml`
+Workflow files:
+- `.github/workflows/weekly-digest.yml` — AI Ecosystem + AI Marketing digests
+- `.github/workflows/dtc-digest.yml` — DTC Marketing Digest
+
 Runs on: `louloret/last30days-skill` (fork), branch `custom`
 
 ---
@@ -126,3 +131,4 @@ Quick-mode priority order: `reddit → hackernews → x` (limit 3)
 | `AUTH_TOKEN` + `CT0` | X/Bird search (Twitter session cookies) |
 | `SCRAPECREATORS_API_KEY` | Reddit (ScrapeCreators backup) |
 | `GH_SUBSCRIBERS_TOKEN` | Fetching subscriber list from private repo |
+| `GH_DIGESTS_TOKEN` | Publishing rendered markdown to `louloret/agentic-digests` |
