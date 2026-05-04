@@ -187,6 +187,15 @@ def txt_to_html(text):
     if in_list: out.append("</ul>")
     return "\n".join(out)
 
+def repos_to_md(repos, title):
+    if not repos:
+        return ""
+    lines = [f"\n## {title}\n", "| # | Repo | Stars | Last Push |", "|---|------|-------|-----------|"]
+    for i, r in enumerate(repos, 1):
+        desc = (r.get("description") or "")[:80]
+        lines.append(f"| {i} | [{r['full_name']}]({r['html_url']}) [{desc}] | ★ {r['stargazers_count']:,} | {fmt_age(r['pushed_at'])} |")
+    return "\n".join(lines) + "\n"
+
 def repos_to_html(repos, title="🔥 Top GitHub Repos"):
     if not repos:
         return ""
@@ -295,7 +304,12 @@ def main():
         print(f"Sent: {result.get('id', 'ok')} → {recipient}")
 
     if args.save_md:
-        Path(args.save_md).write_text(display_body, encoding="utf-8")
+        md = display_body
+        if trending:
+            md += repos_to_md(trending, f"🌟 Trending GitHub Repos (last {args.trending_days} days)")
+        if top_repos:
+            md += repos_to_md(top_repos, "🔥 Top GitHub Repos")
+        Path(args.save_md).write_text(md, encoding="utf-8")
         print(f"Saved: {args.save_md}", file=sys.stderr)
 
 if __name__ == "__main__":
