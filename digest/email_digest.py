@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Send digest via Resend as HTML. Usage: script | python3 email_digest.py --terms term1 term2"""
+"""Send digest via Gmail SMTP as HTML. Usage: script | python3 email_digest.py --terms term1 term2"""
 
 import argparse
 import json
 import math
 import os
 import re
+import smtplib
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -23,7 +26,7 @@ def load_env():
             if line and not line.startswith("#") and "=" in line:
                 k, _, v = line.partition("=")
                 env[k.strip()] = v.strip().strip('"').strip("'")
-    for key in ("RESEND_API_KEY", "RESEND_TO", "ANTHROPIC_API_KEY"):
+    for key in ("GMAIL_APP_PASSWORD", "RESEND_TO", "ANTHROPIC_API_KEY"):
         if key not in env and key in os.environ:
             env[key] = os.environ[key]
     return env
@@ -232,25 +235,24 @@ def build_html(subject, body_text, trending_repos, top_repos, trending_days=7):
 
 # ── Send ─────────────────────────────────────────────────────────────────────
 
-def send(api_key, to, subject, text_body, html_body):
-    payload = json.dumps({
-        "from": "AI Digest <onboarding@resend.dev>",
-        "to": [to],
-        "subject": subject,
-        "text": text_body,
-        "html": html_body,
-    }).encode()
-    req = Request("https://api.resend.com/emails", data=payload, headers={
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        "User-Agent": "python-urllib/3.13",
-    }, method="POST")
+GMAIL_USER = "luisgrowthhack@gmail.com"
+
+def send(gmail_password, to, subject, text_body, html_body):
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"AI Digest <{GMAIL_USER}>"
+    msg["To"] = to
+    msg.attach(MIMEText(text_body, "plain"))
+    msg.attach(MIMEText(html_body, "html"))
     try:
-        with urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read())
-    except HTTPError as e:
-        print(f"Resend error {e.code}: {e.read().decode()}", file=sys.stderr)
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(GMAIL_USER, gmail_password)
+            server.sendmail(GMAIL_USER, to, msg.as_string())
+    except Exception as e:
+        print(f"Gmail error: {e}", file=sys.stderr)
         sys.exit(1)
+    return {"id": "ok"}
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -263,9 +265,9 @@ def main():
     args = parser.parse_args()
 
     env = load_env()
-    api_key = env.get("RESEND_API_KEY")
+    api_key = env.get("GMAIL_APP_PASSWORD")
     if not api_key:
-        print("ERROR: RESEND_API_KEY must be set", file=sys.stderr)
+        print("ERROR: GMAIL_APP_PASSWORD must be set", file=sys.stderr)
         sys.exit(1)
 
     if args.subscribers_file:
