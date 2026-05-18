@@ -91,6 +91,7 @@ jobs:
 
   marketing:
     name: AI Marketing Digest
+    needs: ecosystem
     runs-on: ubuntu-latest
     env:
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}

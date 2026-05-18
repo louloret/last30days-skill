@@ -70,6 +70,7 @@ def synthesize(text, api_key):
         "max_tokens": 3000,
         "messages": [{"role": "user", "content": _SYNTHESIS_PROMPT + text}],
     }).encode()
+    import time
     req = Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
@@ -80,13 +81,22 @@ def synthesize(text, api_key):
         },
         method="POST",
     )
-    try:
-        with urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read())
-            return data["content"][0]["text"]
-    except Exception as e:
-        print(f"Synthesis skipped: {e}", file=sys.stderr)
-        return None
+    for attempt in range(3):
+        try:
+            with urlopen(req, timeout=30) as resp:
+                data = json.loads(resp.read())
+                return data["content"][0]["text"]
+        except HTTPError as e:
+            if e.code == 529 and attempt < 2:
+                wait = 15 * (attempt + 1)
+                print(f"Synthesis 529 overload, retrying in {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+            else:
+                print(f"Synthesis skipped: {e}", file=sys.stderr)
+                return None
+        except Exception as e:
+            print(f"Synthesis skipped: {e}", file=sys.stderr)
+            return None
 
 
 # ── GitHub repo fetching ────────────────────────────────────────────────────
