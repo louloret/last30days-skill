@@ -235,7 +235,7 @@ def build_html(subject, body_text, trending_repos, top_repos, trending_days=7):
 
 # ── Send ─────────────────────────────────────────────────────────────────────
 
-GMAIL_USER = "luisgrowthhack@gmail.com"
+GMAIL_USER = "luisgrowthscience@gmail.com"
 
 def send(gmail_password, to, subject, text_body, html_body):
     msg = MIMEMultipart("alternative")
