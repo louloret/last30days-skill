@@ -1,0 +1,159 @@
+name: Catchup Digest
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipients:
+        description: 'Comma-separated email addresses to send to'
+        type: string
+        required: true
+      digest:
+        description: 'Which digest to send'
+        type: choice
+        options:
+          - weekly
+          - ecosystem
+          - marketing
+          - dtc
+        default: weekly
+
+jobs:
+  ecosystem:
+    name: AI Ecosystem Digest
+    if: inputs.digest == 'ecosystem' || inputs.digest == 'weekly'
+    runs-on: ubuntu-latest
+    env:
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      CT0: ${{ secrets.CT0 }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Write recipients
+        run: |
+          echo "${{ github.event.inputs.recipients }}" | tr ',' '\n' | tr -d ' ' | grep -v '^$' > /tmp/subscribers.txt
+          echo "Recipients: $(wc -l < /tmp/subscribers.txt)"
+          cat /tmp/subscribers.txt
+
+      - name: Run ecosystem digest
+        run: |
+          cat > /tmp/plan.json << 'EOF'
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"claude-code","search_query":"claude code ai agent","ranking_query":"What are developers saying about Claude Code and AI coding agents this week?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"mcp-servers","search_query":"mcp server model context protocol","ranking_query":"What new MCP servers and integrations are developers building?","sources":["reddit","hackernews","x"],"weight":0.8},{"label":"ai-skills","search_query":"ai coding automation developer workflow","ranking_query":"What AI coding skills and developer automation workflows are trending?","sources":["reddit","hackernews"],"weight":0.6}]}
+          EOF
+
+          NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
+          HEADER="=== AI Ecosystem Digest · ${NOW} (last 7 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "ai skills claude code mcp server" \
+              --agent --emit=compact --days=7 --quick \
+              --save-dir=/tmp/digests --save-suffix=ecosystem \
+              --subreddits=claudeskills,AI_Agents,AskVibeCoders,Entrepreneur,ClaudeAI \
+              --plan "$(cat /tmp/plan.json)"
+          ) | python digest/email_digest.py --terms "ai skills" "claude code" "mcp server" \
+              --trending-days 7 \
+              --subscribers-file /tmp/subscribers.txt
+
+  marketing:
+    name: AI Marketing Digest
+    if: inputs.digest == 'marketing' || inputs.digest == 'weekly'
+    runs-on: ubuntu-latest
+    env:
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      CT0: ${{ secrets.CT0 }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Write recipients
+        run: |
+          echo "${{ github.event.inputs.recipients }}" | tr ',' '\n' | tr -d ' ' | grep -v '^$' > /tmp/subscribers.txt
+          echo "Recipients: $(wc -l < /tmp/subscribers.txt)"
+          cat /tmp/subscribers.txt
+
+      - name: Run marketing digest
+        run: |
+          cat > /tmp/plan.json << 'EOF'
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"ai-tools-daily","search_query":"ai marketing tools actually using","ranking_query":"What AI marketing tools are practitioners actually using every day, not just testing?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"ai-video-marketing","search_query":"ai video tools short form content marketing","ranking_query":"What AI video tools are marketers using for TikTok, Reels, and short-form content?","sources":["reddit","hackernews","x"],"weight":0.9},{"label":"ai-growth-automation","search_query":"ai marketing automation workflow growth","ranking_query":"What AI automation and workflow tools are saving marketers the most time?","sources":["reddit","hackernews"],"weight":0.7}]}
+          EOF
+
+          NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
+          HEADER="=== AI Marketing Digest · ${NOW} (last 7 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "ai marketing" \
+              --agent --emit=compact --days=14 --quick \
+              --save-dir=/tmp/digests --save-suffix=marketing \
+              --subreddits=aiToolForBusiness,AskMarketing,generativeAI,DigitalMarketing,Entrepreneur,SaaS,ecommerce \
+              --plan "$(cat /tmp/plan.json)"
+          ) | python digest/email_digest.py --terms "ai marketing" "ai growth" \
+              --trending-days 14 \
+              --subscribers-file /tmp/subscribers.txt
+
+  dtc:
+    name: DTC Marketing Digest
+    if: inputs.digest == 'dtc'
+    runs-on: ubuntu-latest
+    env:
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+      CT0: ${{ secrets.CT0 }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Write recipients
+        run: |
+          echo "${{ github.event.inputs.recipients }}" | tr ',' '\n' | tr -d ' ' | grep -v '^$' > /tmp/subscribers.txt
+          echo "Recipients: $(wc -l < /tmp/subscribers.txt)"
+          cat /tmp/subscribers.txt
+
+      - name: Run DTC digest
+        run: |
+          cat > /tmp/plan.json << 'EOF'
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"dtc-tools","search_query":"direct to consumer ecommerce marketing tools analytics attribution","ranking_query":"What tools are DTC brands actually using — attribution, email/SMS, analytics, retention?","sources":["reddit","x"],"weight":1.0},{"label":"dtc-paid-creative","search_query":"dtc paid social creative ads facebook tiktok ugc","ranking_query":"What ad creative strategies and paid social tactics are DTC marketers seeing results with?","sources":["reddit","x"],"weight":0.9},{"label":"dtc-retention","search_query":"dtc email sms retention ltv repeat purchase shopify","ranking_query":"What retention and LTV strategies are DTC brands deploying via email and SMS?","sources":["reddit","x"],"weight":0.8}]}
+          EOF
+
+          NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
+          HEADER="=== DTC Marketing Digest · ${NOW} (last 30 days) ==="
+          (
+            echo "${HEADER}"
+            python scripts/last30days.py "dtc marketing" \
+              --agent --emit=compact --days=30 --quick \
+              --save-dir=/tmp/digests --save-suffix=dtc \
+              --subreddits=ecommerce,Entrepreneur,shopify,DigitalMarketing,dtcmarketing,smallbusiness \
+              --plan "$(cat /tmp/plan.json)"
+          ) | python digest/email_digest.py --terms "dtc" "ecommerce" "klaviyo" "triple whale" \
+              --subscribers-file /tmp/subscribers.txt
