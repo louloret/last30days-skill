@@ -3,10 +3,6 @@ name: Catchup Digest
 on:
   workflow_dispatch:
     inputs:
-      recipients:
-        description: 'Comma-separated email addresses to send to'
-        type: string
-        required: true
       digest:
         description: 'Which digest to send'
         type: choice
@@ -26,6 +22,7 @@ jobs:
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GH_SUBSCRIBERS_TOKEN: ${{ secrets.GH_SUBSCRIBERS_TOKEN }}
       AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
       CT0: ${{ secrets.CT0 }}
     steps:
@@ -40,9 +37,13 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Write recipients
+      - name: Fetch recipients
         run: |
-          echo "${{ github.event.inputs.recipients }}" | tr ',' '\n' | tr -d ' ' | grep -v '^$' > /tmp/subscribers.txt
+          curl -f -s \
+            -H "Authorization: Bearer $GH_SUBSCRIBERS_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            "https://api.github.com/repos/louloret/last30days-subscribers/contents/catchup/pending.txt" \
+            > /tmp/subscribers.txt
           echo "Recipients: $(wc -l < /tmp/subscribers.txt)"
           cat /tmp/subscribers.txt
 
@@ -73,6 +74,7 @@ jobs:
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GH_SUBSCRIBERS_TOKEN: ${{ secrets.GH_SUBSCRIBERS_TOKEN }}
       AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
       CT0: ${{ secrets.CT0 }}
     steps:
@@ -87,9 +89,13 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Write recipients
+      - name: Fetch recipients
         run: |
-          echo "${{ github.event.inputs.recipients }}" | tr ',' '\n' | tr -d ' ' | grep -v '^$' > /tmp/subscribers.txt
+          curl -f -s \
+            -H "Authorization: Bearer $GH_SUBSCRIBERS_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            "https://api.github.com/repos/louloret/last30days-subscribers/contents/catchup/pending.txt" \
+            > /tmp/subscribers.txt
           echo "Recipients: $(wc -l < /tmp/subscribers.txt)"
           cat /tmp/subscribers.txt
 
@@ -120,6 +126,7 @@ jobs:
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       SCRAPECREATORS_API_KEY: ${{ secrets.SCRAPECREATORS_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GH_SUBSCRIBERS_TOKEN: ${{ secrets.GH_SUBSCRIBERS_TOKEN }}
       AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
       CT0: ${{ secrets.CT0 }}
     steps:
@@ -134,9 +141,13 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Write recipients
+      - name: Fetch recipients
         run: |
-          echo "${{ github.event.inputs.recipients }}" | tr ',' '\n' | tr -d ' ' | grep -v '^$' > /tmp/subscribers.txt
+          curl -f -s \
+            -H "Authorization: Bearer $GH_SUBSCRIBERS_TOKEN" \
+            -H "Accept: application/vnd.github.v3.raw" \
+            "https://api.github.com/repos/louloret/last30days-subscribers/contents/catchup/pending.txt" \
+            > /tmp/subscribers.txt
           echo "Recipients: $(wc -l < /tmp/subscribers.txt)"
           cat /tmp/subscribers.txt
 
@@ -157,3 +168,42 @@ jobs:
               --plan "$(cat /tmp/plan.json)"
           ) | python digest/email_digest.py --terms "dtc" "ecommerce" "klaviyo" "triple whale" \
               --subscribers-file /tmp/subscribers.txt
+
+  cleanup:
+    name: Merge into subscribers & clear pending
+    needs: [ecosystem, marketing, dtc]
+    if: always() && (needs.ecosystem.result == 'success' || needs.marketing.result == 'success' || needs.dtc.result == 'success')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_SUBSCRIBERS_TOKEN }}
+    steps:
+      - name: Append pending to subscribers.txt and delete pending.txt
+        run: |
+          REPO="louloret/last30days-subscribers"
+
+          # Fetch pending.txt (need SHA for delete)
+          PENDING_JSON=$(gh api "/repos/${REPO}/contents/catchup/pending.txt")
+          PENDING_SHA=$(echo "$PENDING_JSON" | jq -r '.sha')
+          PENDING=$(echo "$PENDING_JSON" | jq -r '.content' | base64 -d | tr -d '\r')
+
+          # Fetch current subscribers.txt
+          SUB_JSON=$(gh api "/repos/${REPO}/contents/subscribers.txt")
+          SUB_SHA=$(echo "$SUB_JSON" | jq -r '.sha')
+          CURRENT=$(echo "$SUB_JSON" | jq -r '.content' | base64 -d | tr -d '\r')
+
+          # Merge and dedupe, preserve trailing newline
+          MERGED=$(printf "%s\n%s\n" "$CURRENT" "$PENDING" | sort -u | grep -v '^$')
+          ENCODED=$(printf "%s\n" "$MERGED" | base64 -w0)
+
+          # Write updated subscribers.txt
+          gh api --method PUT "/repos/${REPO}/contents/subscribers.txt" \
+            --field message="catchup: merge pending into subscribers" \
+            --field content="$ENCODED" \
+            --field sha="$SUB_SHA" --silent
+
+          # Delete pending.txt
+          gh api --method DELETE "/repos/${REPO}/contents/catchup/pending.txt" \
+            --field message="catchup: clear pending after send" \
+            --field sha="$PENDING_SHA" --silent
+
+          echo "Done: pending merged into subscribers.txt and cleared"
