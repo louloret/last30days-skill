@@ -232,7 +232,11 @@ def repos_to_html(repos, title="🔥 Top GitHub Repos"):
         "</table>"
     )
 
-def build_html(subject, body_text, trending_repos, top_repos, trending_days=7):
+def build_html(subject, body_text, trending_repos, top_repos, trending_days=7, recipient=None):
+    unsubscribe_html = ""
+    if recipient:
+        mailto = f"mailto:{GMAIL_USER}?subject=Unsubscribe&body={recipient}"
+        unsubscribe_html = f' · <a href="{mailto}" style="color:#999;">Unsubscribe</a>'
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"></head>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:680px;margin:0 auto;padding:24px;color:#24292e;line-height:1.6;">
 <h1 style="border-bottom:2px solid #e1e4e8;padding-bottom:12px;font-size:1.4em;">{subject}</h1>
@@ -240,7 +244,7 @@ def build_html(subject, body_text, trending_repos, top_repos, trending_days=7):
 {repos_to_html(trending_repos, title=f"🌟 Trending GitHub Repos (last {trending_days} days)")}
 {repos_to_html(top_repos)}
 <hr>
-<p style="color:#999;font-size:11px;">AI Digest · <a href="https://github.com/louloret/last30days-skill" style="color:#999;">last30days</a></p>
+<p style="color:#999;font-size:11px;">AI Digest · <a href="https://github.com/louloret/last30days-skill" style="color:#999;">last30days</a>{unsubscribe_html}</p>
 </body></html>"""
 
 # ── Send ─────────────────────────────────────────────────────────────────────
@@ -310,8 +314,9 @@ def main():
 
     trending = fetch_trending_repos(args.terms, days=args.trending_days) if args.terms else []
     top_repos = fetch_top_repos(args.terms) if args.terms else []
-    html  = build_html(subject, display_body, trending, top_repos, trending_days=args.trending_days)
     for recipient in recipients:
+        html = build_html(subject, display_body, trending, top_repos,
+                          trending_days=args.trending_days, recipient=recipient)
         result = send(api_key, recipient, subject, display_body, html)
         print(f"Sent: {result.get('id', 'ok')} → {recipient}")
 
