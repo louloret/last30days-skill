@@ -243,6 +243,9 @@ def build_html(subject, body_text, trending_repos, top_repos, trending_days=7, r
 {txt_to_html(body_text)}
 {repos_to_html(trending_repos, title=f"🌟 Trending GitHub Repos (last {trending_days} days)")}
 {repos_to_html(top_repos)}
+<div style="background:#f6f8fa;border-left:3px solid #e1e4e8;padding:12px 16px;margin:24px 0;border-radius:0 4px 4px 0;">
+<p style="margin:0;font-size:13px;color:#555;">📬 Missed an issue? <a href="https://github.com/louloret/agentic-digests" style="color:#0969da;">Browse the archive →</a></p>
+</div>
 <hr>
 <p style="color:#999;font-size:11px;">AI Digest · <a href="https://github.com/louloret/last30days-skill" style="color:#999;">last30days</a>{unsubscribe_html}</p>
 </body></html>"""
