@@ -51,19 +51,19 @@ jobs:
       - name: Run ecosystem digest
         run: |
           cat > /tmp/plan.json << 'EOF'
-          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"claude-code","search_query":"claude code ai agent","ranking_query":"What are developers saying about Claude Code and AI coding agents this week?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"mcp-servers","search_query":"mcp server model context protocol","ranking_query":"What new MCP servers and integrations are developers building?","sources":["reddit","hackernews","x"],"weight":0.8},{"label":"ai-skills","search_query":"ai coding automation developer workflow","ranking_query":"What AI coding skills and developer automation workflows are trending?","sources":["reddit","hackernews"],"weight":0.6}]}
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"practical-agent-workflows","search_query":"AI agent workflow automation case study","ranking_query":"What concrete AI agent workflow implementations and case studies are developers sharing this week?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"agent-execution","search_query":"AI agent browser automation tool use workflow","ranking_query":"What are developers building with AI agents that automate browser tasks, API calls, and file operations?","sources":["reddit","hackernews","x"],"weight":0.9},{"label":"mcp-integrations","search_query":"MCP server Model Context Protocol integration workflow","ranking_query":"What new MCP server integrations are being built and shipped?","sources":["reddit","hackernews","x"],"weight":0.8},{"label":"builder-workflows","search_query":"Claude Code Cursor n8n AI workflow","ranking_query":"What workflows are practitioners building with Claude Code, Cursor, n8n, and similar tools?","sources":["reddit","hackernews","x"],"weight":0.8},{"label":"agent-reliability","search_query":"AI agent evaluation tracing human-in-the-loop","ranking_query":"What are developers learning about making AI agents reliable, traceable, and safe in production?","sources":["reddit","hackernews"],"weight":0.7}]}
           EOF
 
           NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
           HEADER="=== AI Ecosystem Digest · ${NOW} (last 7 days) ==="
           (
             echo "${HEADER}"
-            python scripts/last30days.py "ai skills claude code mcp server" \
+            python scripts/last30days.py "AI agent workflow automation MCP Claude Code" \
               --agent --emit=compact --days=7 --quick \
               --save-dir=/tmp/digests --save-suffix=ecosystem \
-              --subreddits=claudeskills,AI_Agents,AskVibeCoders,Entrepreneur,ClaudeAI \
+              --subreddits=claudeskills,AI_Agents,AskVibeCoders,LangChain,LocalLLaMA,ClaudeAI \
               --plan "$(cat /tmp/plan.json)"
-          ) | python digest/email_digest.py --terms "ai skills" "claude code" "mcp server" \
+          ) | python digest/email_digest.py --terms "agent workflow" "MCP server" "Claude Code" "automation" \
               --trending-days 7 \
               --subscribers-file /tmp/subscribers.txt \
               --save-md /tmp/digest.md
@@ -130,19 +130,19 @@ jobs:
       - name: Run marketing digest
         run: |
           cat > /tmp/plan.json << 'EOF'
-          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"ai-tools-daily","search_query":"ai marketing tools actually using","ranking_query":"What AI marketing tools are practitioners actually using every day, not just testing?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"ai-video-marketing","search_query":"ai video tools short form content marketing","ranking_query":"What AI video tools are marketers using for TikTok, Reels, and short-form content?","sources":["reddit","hackernews","x"],"weight":0.9},{"label":"ai-growth-automation","search_query":"ai marketing automation workflow growth","ranking_query":"What AI automation and workflow tools are saving marketers the most time?","sources":["reddit","hackernews"],"weight":0.7}]}
+          {"intent":"product","freshness_mode":"strict_recent","cluster_mode":"none","subqueries":[{"label":"marketing-agent-workflows","search_query":"AI agent marketing workflow automation case study","ranking_query":"What AI agent marketing workflow case studies are practitioners sharing?","sources":["reddit","hackernews","x"],"weight":1.0},{"label":"marketing-ops","search_query":"AI marketing campaign reporting content workflow automation","ranking_query":"What AI tools are marketers using for campaign management, reporting, and content workflows?","sources":["reddit","hackernews","x"],"weight":0.9},{"label":"growth-experiments","search_query":"AI marketing experimentation personalization optimization workflow","ranking_query":"What AI-powered marketing experiments, personalization, and optimization workflows are showing results?","sources":["reddit","hackernews","x"],"weight":0.8},{"label":"revenue-ops","search_query":"AI lead enrichment qualification scoring CRM workflow","ranking_query":"What AI workflows are teams using for lead enrichment, scoring, qualification, and CRM automation?","sources":["reddit","hackernews"],"weight":0.7}]}
           EOF
 
           NOW=$(date -u "+%Y-%m-%d %H:%M:%S")
           HEADER="=== AI Marketing Digest · ${NOW} (last 7 days) ==="
           (
             echo "${HEADER}"
-            python scripts/last30days.py "ai marketing" \
+            python scripts/last30days.py "AI agent marketing workflow automation" \
               --agent --emit=compact --days=14 --quick \
               --save-dir=/tmp/digests --save-suffix=marketing \
               --subreddits=aiToolForBusiness,AskMarketing,generativeAI,DigitalMarketing,Entrepreneur,SaaS,ecommerce \
               --plan "$(cat /tmp/plan.json)"
-          ) | python digest/email_digest.py --terms "ai marketing" "ai growth" \
+          ) | python digest/email_digest.py --terms "agent workflow" "ai marketing" "automation" "CRM" \
               --trending-days 14 \
               --subscribers-file /tmp/subscribers.txt \
               --save-md /tmp/digest.md
