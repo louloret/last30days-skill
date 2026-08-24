@@ -543,6 +543,15 @@ def search_reddit(
     else:
         _log(f"No posts within date range, keeping all {len(all_items)}")
 
+    # === Phase 5b: Minimum score filter ===
+    MIN_SCORE = 10
+    scored = [item for item in all_items if (item.get("engagement") or {}).get("score", 0) >= MIN_SCORE]
+    if scored:
+        _log(f"Score filter: kept {len(scored)}/{len(all_items)} posts with score >= {MIN_SCORE}")
+        all_items = scored
+    else:
+        _log(f"Score filter: no posts above {MIN_SCORE}, keeping all {len(all_items)}")
+
     # === Phase 6: Sort by engagement (upvotes + comment count) ===
     all_items.sort(
         key=lambda x: _total_engagement(x),
