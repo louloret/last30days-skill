@@ -272,7 +272,7 @@ def search_x(
         _last_search_time = time.time()
 
     # Quality filter: drop low-engagement tweets and replies at the API level
-    min_faves = {"quick": 3, "default": 5, "deep": 10}.get(depth, 5)
+    min_faves = {"quick": 25, "default": 50, "deep": 100}.get(depth, 50)
     quality_filter = f"min_faves:{min_faves} -filter:replies"
 
     core_topic = _extract_core_subject(topic)
